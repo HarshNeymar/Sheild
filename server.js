@@ -12,12 +12,12 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-// Serve static files from the build directory
+// Serve static files from the build directory (Vite output)
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Initialize Gemini
-// NOTE: On GCP Cloud Run, the API_KEY is injected via environment variables
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// FIXED: Changed process.env.API_KEY to process.env.GEMINI_API_KEY to match Cloud Run Secret
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.post('/api/generate', async (req, res) => {
   try {
@@ -25,7 +25,7 @@ app.post('/api/generate', async (req, res) => {
 
     // Use the backend client to call Gemini
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash", // Using the latest stable flash model
+      model: "gemini-1.5-flash", // Switched to 1.5 Flash (Standard for production speed/cost)
       contents: prompt,
       config: config
     });
@@ -37,11 +37,9 @@ app.post('/api/generate', async (req, res) => {
   } catch (error) {
     console.error("Server API Error:", error);
     
-    // Pass robust error details back to frontend
     const status = error.status || 500;
     const message = error.message || 'Internal Server Error';
     
-    // Handle Quota limits explicitly
     if (status === 429 || message.includes('429')) {
       return res.status(429).json({ error: "Server busy (Quota Exceeded). Please try again later." });
     }
