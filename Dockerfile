@@ -1,19 +1,23 @@
-# 1. Use an official lightweight Python image
-FROM python:3.10-slim
+# Use Node 20 (Lightweight)
+FROM node:20-slim
 
-# 2. Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# 3. Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy package files first to leverage Docker caching
+COPY package*.json ./
 
-# 4. Copy the rest of your application code
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the app code
 COPY . .
 
-# 5. Expose the port (Cloud Run defaults to 8080)
+# Build the frontend (creates the 'dist' folder)
+RUN npm run build
+
+# Expose the port Cloud Run needs
 ENV PORT 8080
 
-# 6. Run the application
-# CHANGE "main:app" to match your actual filename (e.g., if your file is app.py, use app:app)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Start the server
+CMD ["npm", "start"]
