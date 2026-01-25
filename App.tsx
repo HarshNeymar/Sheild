@@ -15,7 +15,8 @@ const CLASSES = [
 const PRE_SCHOOL_CLASSES = ['Playgroup', 'Nursery', 'LKG', 'UKG'];
 
 const generateTimeOptions = () => {
-  const times = [];
+  // FIX: Added explicit string[] type to prevent TS7034/TS7005 errors
+  const times: string[] = [];
   const addTime = (h: number, m: string, p: string) => times.push(`${h}:${m} ${p}`);
   for(let h=5; h<=11; h++) { addTime(h, '00', 'AM'); addTime(h, '15', 'AM'); addTime(h, '30', 'AM'); addTime(h, '45', 'AM'); }
   addTime(12, '00', 'PM'); addTime(12, '15', 'PM'); addTime(12, '30', 'PM'); addTime(12, '45', 'PM');
@@ -285,11 +286,10 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const pw = doc.internal.pageSize.getWidth();
       const ph = doc.internal.pageSize.getHeight();
       let primaryRGB: [number, number, number] = [79, 70, 229];
-      let lightRGB: [number, number, number] = [240, 244, 255]; 
       let planTitle = "SUCCESS ROADMAP";
       
-      if (state.branch?.includes('DIET')) { primaryRGB = [225, 29, 72]; lightRGB = [255, 241, 242]; planTitle = "PERSONALIZED DIET PLAN"; }
-      else if (state.branch?.includes('WELLNESS')) { primaryRGB = [16, 185, 129]; lightRGB = [236, 253, 245]; planTitle = "STUDENT WELLNESS PLAN"; }
+      if (state.branch?.includes('DIET')) { primaryRGB = [225, 29, 72]; planTitle = "PERSONALIZED DIET PLAN"; }
+      else if (state.branch?.includes('WELLNESS')) { primaryRGB = [16, 185, 129]; planTitle = "STUDENT WELLNESS PLAN"; }
 
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.rect(0, 0, pw, 28, 'F');
@@ -324,7 +324,8 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
         const isTableObj = content && typeof content === 'object' && 'headers' in content && 'rows' in content;
         
         if (isTableObj) {
-          const tableObj = content as { headers: string[], rows: string[][] };
+          // FIX: Cast to unknown first to avoid TS2352 overlap error
+          const tableObj = content as unknown as { headers: string[], rows: string[][] };
           autoTable(doc, {
             startY: y,
             head: [tableObj.headers.map(h => h.toUpperCase())],
@@ -336,7 +337,6 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
           });
           y = (doc as any).lastAutoTable.finalY + 18;
         } else if (Array.isArray(content)) {
-            // Logic for regular lists
             content.forEach(item => {
                 doc.text(`• ${cleanText(item)}`, 20, y);
                 y += 7;
@@ -398,7 +398,6 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   );
 };
 
-// ... TimeSelect and RoutineForm components ...
 const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
     <div className="space-y-1">
       <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>
