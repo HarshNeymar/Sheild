@@ -15,7 +15,7 @@ const CLASSES = [
 const PRE_SCHOOL_CLASSES = ['Playgroup', 'Nursery', 'LKG', 'UKG'];
 
 const generateTimeOptions = () => {
-  const times = [];
+  const times: string[] = [];
   const addTime = (h: number, m: string, p: string) => times.push(`${h}:${m} ${p}`);
 
   // Morning 5 AM to 11 AM

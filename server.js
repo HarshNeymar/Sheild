@@ -12,39 +12,55 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-// Serve static files from the build directory (Vite output)
+// Serve static files from the build directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Initialize Gemini
-// FIXED: Changed process.env.API_KEY to process.env.GEMINI_API_KEY to match Cloud Run Secret
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// NOTE: On GCP Cloud Run, the API_KEY is injected via environment variables
+const apiKey = process.env.API_KEY;
+if (!apiKey) {
+  console.error("CRITICAL ERROR: API_KEY environment variable is missing!");
+}
+
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 app.post('/api/generate', async (req, res) => {
+  console.log("Received generation request");
   try {
     const { prompt, config } = req.body;
 
-    // Use the backend client to call Gemini
+    // Use a widely available preview model
+    // 'gemini-2.0-flash-exp' is the current standard for the 2.0 Flash preview
+    const modelId = "gemini-2.0-flash-exp"; 
+
+    console.log(`Calling Gemini Model: ${modelId}`);
+
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash", // Switched to 1.5 Flash (Standard for production speed/cost)
+      model: modelId,
       contents: prompt,
       config: config
     });
+
+    console.log("Gemini API response received successfully");
 
     // Extract the text to send back to client
     const text = response.text;
     res.json({ text });
 
   } catch (error) {
-    console.error("Server API Error:", error);
+    console.error("Server API Error Full Trace:", error);
     
+    // Pass robust error details back to frontend
     const status = error.status || 500;
     const message = error.message || 'Internal Server Error';
     
+    // Handle Quota limits explicitly
     if (status === 429 || message.includes('429')) {
       return res.status(429).json({ error: "Server busy (Quota Exceeded). Please try again later." });
     }
 
-    res.status(status).json({ error: message });
+    // Send the actual error message to the client for easier debugging
+    res.status(status).json({ error: `AI Generation Failed: ${message}` });
   }
 });
 
