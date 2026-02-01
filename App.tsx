@@ -197,6 +197,9 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       setPasswordResetStage(false);
   };
 
+
+
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-white">
@@ -733,8 +736,40 @@ const RoutineForm: React.FC<{
     tuitionTime: '',
     eveningActivity: '',
     dinnerTime: '',
-    bedTime: ''
+    bedTime: '',
+    afterSchoolActivityStartTime : '',
+    afterSchoolActivityEndTime: ''
   });
+
+    const [routines, setRoutines] = useState([
+  {
+    napRoutine: "",
+    afterSchoolActivityStartTime: "",
+    afterSchoolActivityEndTime: ""
+  }
+]);
+
+const [showTimes, setShowTimes] = useState(false);
+
+const [routines2, setRoutines2] = useState([
+  {
+    tuitionTime: "",
+    startTime: "",
+    endTime: ""
+  }
+]);
+
+const [showEveningTimes, setShowEveningTimes] = useState(false);
+
+const [routines3, setRoutines3] = useState([
+  {
+    eveningActivity: "",
+    startTime: "",
+    endTime: ""
+  }
+]);
+
+
 
   const [schoolStart, setSchoolStart] = useState('');
   const [schoolEnd, setSchoolEnd] = useState('');
@@ -794,20 +829,208 @@ const RoutineForm: React.FC<{
         <TimeSelect label="Dinner Time" value={r.dinnerTime} onChange={v => setR({...r, dinnerTime: v})} />
       </div>
 
+
+      {/* <div className='grid grid-cols-3 gap-2'>
       <div className="space-y-1">
         <label className="text-[10px] font-bold text-slate-500 uppercase">{isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}</label>
         <input type="text" placeholder={isPreSchool ? "e.g. Nap from 2-4 PM" : "e.g. Rest & Snacks"} value={r.napRoutine} onChange={e => setR({...r, napRoutine: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
-      </div>
 
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">Tuition / Coaching?</label>
-        <input type="text" placeholder="e.g. Math Tuition 5-6 PM (or None)" value={r.tuitionTime} onChange={e => setR({...r, tuitionTime: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
       </div>
+              <TimeSelect label="Start Time" value={r.afterSchoolActivityStartTime} onChange={v => setR({...r, afterSchoolActivityStartTime: v})} />
+        <TimeSelect label="End Time" value={r.afterSchoolActivityEndTime} onChange={v => setR({...r, afterSchoolActivityEndTime: v})} />
+      </div> */}
+{routines.map((r, index) => (
+  <div key={index} className="grid grid-cols-3 gap-2 items-end">
+    
+    <div className="space-y-1">
+      {index === 0 && (
+        <label className="text-[10px] font-bold text-slate-500 uppercase">
+          {isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
+        </label>
+      )}
 
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">Evening Activity</label>
-        <input type="text" placeholder="e.g. Playing, TV, Homework" value={r.eveningActivity} onChange={e => setR({...r, eveningActivity: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
-      </div>
+      <input
+        type="text"
+        placeholder={isPreSchool ? "e.g. Nap from 2-4 PM" : "e.g. Rest & Snacks"}
+        value={r.napRoutine}
+        onChange={e => {
+          const copy = [...routines];
+          copy[index].napRoutine = e.target.value;
+          setRoutines(copy);
+        }}
+        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold"
+      />
+    </div>
+
+    <TimeSelect
+      label={index === 0 ? "Start Time" : ""}
+      value={r.afterSchoolActivityStartTime}
+      onChange={v => {
+        const copy = [...routines];
+        copy[index].afterSchoolActivityStartTime = v;
+        setRoutines(copy);
+      }}
+    />
+
+    <TimeSelect
+      label={index === 0 ? "End Time" : ""}
+      value={r.afterSchoolActivityEndTime}
+      onChange={v => {
+        const copy = [...routines];
+        copy[index].afterSchoolActivityEndTime = v;
+        setRoutines(copy);
+      }}
+    />
+
+  </div>
+))}
+
+<button
+  type="button"
+  onClick={() =>
+    setRoutines([
+      ...routines,
+      {
+        napRoutine: "",
+        afterSchoolActivityStartTime: "",
+        afterSchoolActivityEndTime: ""
+      }
+    ])
+  }
+  className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-600"
+>
+  + Add another
+</button>
+
+ {routines2.map((r, index) => (
+  <div key={index} className={`grid ${showTimes ? "grid-cols-3" : "grid-cols-1"} gap-2 items-end`}>
+
+    {/* Tuition */}
+    <div className="space-y-1">
+      {index === 0 && (
+        <label className="text-[10px] font-bold text-slate-500 uppercase">
+          Tuition / Coaching?
+        </label>
+      )}
+      <input
+        type="text"
+        placeholder="e.g. Math Tuition 5-6 PM (or None)"
+        value={r.tuitionTime}
+        onChange={e => {
+          const copy = [...routines2];
+          copy[index].tuitionTime = e.target.value;
+          setRoutines2(copy);
+        }}
+        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold"
+      />
+    </div>
+
+    {/* Start/End only after add */}
+    {showTimes && (
+      <>
+        <TimeSelect
+          label={index === 0 ? "Start Time" : ""}
+          value={r.startTime}
+          onChange={v => {
+            const copy = [...routines2];
+            copy[index].startTime = v;
+            setRoutines2(copy);
+          }}
+        />
+
+        <TimeSelect
+          label={index === 0 ? "End Time" : ""}
+          value={r.endTime}
+          onChange={v => {
+            const copy = [...routines2];
+            copy[index].endTime = v;
+            setRoutines2(copy);
+          }}
+        />
+      </>
+    )}
+  </div>
+))}
+
+<button
+  type="button"
+  onClick={() => {
+    setShowTimes(true);
+    setRoutines2([
+      ...routines2,
+      { tuitionTime: "", startTime: "", endTime: "" }
+    ]);
+  }}
+  className="mt-2 text-xs font-bold text-blue-600"
+>
+  + Add another
+</button>
+
+{routines3.map((r, index) => (
+  <div
+    key={index}
+    className={`grid ${showEveningTimes ? "grid-cols-3" : "grid-cols-1"} gap-2 items-end`}
+  >
+    {/* Evening Activity */}
+    <div className="space-y-1">
+      {index === 0 && (
+        <label className="text-[10px] font-bold text-slate-500 uppercase">
+          Evening Activity
+        </label>
+      )}
+      <input
+        type="text"
+        placeholder="e.g. Playing, TV, Homework"
+        value={r.eveningActivity}
+        onChange={e => {
+          const copy = [...routines3];
+          copy[index].eveningActivity = e.target.value;
+          setRoutines3(copy);
+        }}
+        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold"
+      />
+    </div>
+
+    {/* Start / End only after add */}
+    {showEveningTimes && (
+      <>
+        <TimeSelect
+          label={index === 0 ? "Start Time" : ""}
+          value={r.startTime}
+          onChange={v => {
+            const copy = [...routines3];
+            copy[index].startTime = v;
+            setRoutines3(copy);
+          }}
+        />
+
+        <TimeSelect
+          label={index === 0 ? "End Time" : ""}
+          value={r.endTime}
+          onChange={v => {
+            const copy = [...routines3];
+            copy[index].endTime = v;
+            setRoutines3(copy);
+          }}
+        />
+      </>
+    )}
+  </div>
+))}
+<button
+  type="button"
+  onClick={() => {
+    setShowEveningTimes(true);
+    setRoutines3([
+      ...routines3,
+      { eveningActivity: "", startTime: "", endTime: "" }
+    ]);
+  }}
+  className="mt-2 text-xs font-bold text-blue-600"
+>
+  + Add another
+</button>
+
 
       <button 
         disabled={!isComplete}
