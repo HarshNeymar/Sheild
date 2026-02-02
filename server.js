@@ -28,7 +28,6 @@ app.post('/api/generate', async (req, res) => {
   try {
     const { prompt, config } = req.body;
 
-    // Use the stable Gemini 3 Flash Preview model
     const modelId = "gemini-3-flash-preview"; 
 
     console.log(`Calling Gemini Model: ${modelId}`);
