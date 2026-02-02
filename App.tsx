@@ -306,7 +306,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
     }
   };
 
-  const handleRoutineSubmit = (routineData: Record<string, string>) => {
+  const handleRoutineSubmit = (routineData: Record<string, any>) => {
     const updatedUser: UserProfile = { ...user, routine: routineData };
     onUpdateUser(updatedUser);
     addMessage({ sender: 'bot', text: "Thanks! I've saved your routine." });
@@ -326,7 +326,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       else if (option === 'Personalized Diet Plan') { branch = 'SCHOOL_DIET'; botResponse = "Great choice!"; }
       else { branch = 'SCHOOL_WELLNESS'; botResponse = "I’m glad you care about your wellness!"; }
 
-      addMessage({ sender: 'bot', text: botResponse });
+      addMessage({ sender: 'bot', text: botResponse, type: 'text' as const });
       setState(prev => ({ ...prev, branch, step: 'BRANCH_QUESTIONS', currentQuestionIndex: 0 }));
 
       const firstQ = QUESTIONS[branch][0];
@@ -338,9 +338,8 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const currentQuestion = qs[state.currentQuestionIndex];
       const answerKey = currentQuestion.key;
 
-      // VALIDATION: Ensure Difficult Subjects are in the Current Subjects list
       if (branch === 'SCHOOL_STUDY' && answerKey === 'difficultSubjects') {
-        const currentList = (state.answers['currentSubjects'] || "").split(',').map(s => s.trim().toLowerCase()).filter(s => s !== "");
+        const currentList = (state.answers['currentSubjects'] || "").split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => s !== "");
         const inputList = option.split(',').map(s => s.trim().toLowerCase()).filter(s => s !== "");
         const invalid = inputList.filter(s => !currentList.includes(s));
         if (invalid.length > 0) {
@@ -356,11 +355,10 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       if (nextIndex < qs.length) {
         const nextQ = qs[nextIndex];
         let finalOptions = nextQ.options;
-        let finalType = nextQ.options.length ? 'choice' : 'text';
+        let finalType: any = nextQ.options.length ? 'choice' : 'text';
 
-        // UI PICKER: Inject current subjects as buttons for the difficult subjects question
         if (branch === 'SCHOOL_STUDY' && nextQ.key === 'difficultSubjects') {
-          finalOptions = (updatedAnswers['currentSubjects'] || "").split(',').map(s => s.trim()).filter(s => s !== "");
+          finalOptions = (updatedAnswers['currentSubjects'] || "").split(',').map((s: string) => s.trim()).filter((s: string) => s !== "");
           finalType = 'choice';
         }
 
@@ -397,41 +395,28 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const pw = doc.internal.pageSize.getWidth();
       const ph = doc.internal.pageSize.getHeight();
       let primaryRGB: [number, number, number] = [79, 70, 229];
-      let lightRGB: [number, number, number] = [240, 244, 255]; 
       let planTitle = "SUCCESS ROADMAP";
       
-      if (state.branch?.includes('DIET') || state.branch?.includes('NUTRITION')) { primaryRGB = [225, 29, 72]; lightRGB = [255, 241, 242]; planTitle = "DIET & NUTRITION PLAN"; } 
-      else if (state.branch?.includes('WELLNESS')) { primaryRGB = [16, 185, 129]; lightRGB = [236, 253, 245]; planTitle = "WELLNESS & MINDSET PLAN"; } 
-      else if (state.branch?.includes('DAILY_ROUTINE')) { primaryRGB = [37, 99, 235]; lightRGB = [239, 246, 255]; planTitle = "PRE-SCHOOL ROUTINE"; }
+      if (state.branch?.includes('DIET')) primaryRGB = [225, 29, 72];
+      else if (state.branch?.includes('WELLNESS')) primaryRGB = [16, 185, 129];
 
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.rect(0, 0, pw, 28, 'F');
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'F'); 
-      doc.setFontSize(30); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
-      doc.text(cleanText(state.details.school).toUpperCase() || "YOUR SCHOOL", pw / 2, 32, { align: 'center' });
+      doc.setFontSize(24); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
+      doc.text(cleanText(state.details.school).toUpperCase(), pw / 2, 32, { align: 'center' });
       
-      doc.setFontSize(11); doc.setTextColor(60);
-      const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}`;
-      doc.text(profile, pw / 2, 78, { align: 'center' });
-
       let y = 110;
       result.sections.forEach((sec, idx) => {
         if (y > ph - 45) { doc.addPage(); y = 30; }
-        doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+        doc.setFontSize(14); doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
         doc.text(`${idx + 1}. ${cleanText(sec.heading).toUpperCase()}`, 18, y);
         y += 12;
-        const isTable = Array.isArray(sec.content) && sec.content.length > 0 && typeof sec.content[0] === 'object';
-        if (isTable) {
-          const tableData = (sec.content as any[]).filter(row => row && typeof row === 'object');
-          autoTable(doc, { startY: y, head: [Object.keys(tableData[0])], body: tableData.map((obj: any) => Object.values(obj).map(v => cleanText(v))), theme: 'striped', headStyles: { fillColor: primaryRGB } });
-          y = (doc as any).lastAutoTable.finalY + 18;
-        } else {
-          const content = Array.isArray(sec.content) ? sec.content.join('\n') : cleanText(sec.content);
-          const lines = doc.splitTextToSize(content, pw - 36);
-          doc.text(lines, 18, y);
-          y += (lines.length * 7.5) + 12;
-        }
+        const content = Array.isArray(sec.content) ? sec.content.join('\n') : cleanText(sec.content);
+        const lines = doc.splitTextToSize(content, pw - 36);
+        doc.text(lines, 18, y);
+        y += (lines.length * 7.5) + 12;
       });
       doc.save(`${state.details.name.replace(/\s+/g, '_')}_Plan.pdf`);
     } catch (err) { console.error(err); }
@@ -510,7 +495,6 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   );
 };
 
-// ... Keep existing TimeSelect, RoutineForm, and App components as they are ...
 const TimeSelect: React.FC<{ label?: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
   <div className="space-y-1">
     {label && <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>}
@@ -524,19 +508,14 @@ const TimeSelect: React.FC<{ label?: string, value: string, onChange: (v: string
   </div>
 );
 
-type NapRoutine = { activity: string; startTime: string; endTime: string; };
-type TuitionRoutine = { subject: string; startTime: string; endTime: string; };
-type EveningRoutine = { activity: string; startTime: string; endTime: string; };
-
-const RoutineForm: React.FC<{ onSubmit: (d: Record<string, string>) => void, isPreSchool: boolean }> = ({ onSubmit, isPreSchool }) => {
+const RoutineForm: React.FC<{ onSubmit: (d: Record<string, any>) => void, isPreSchool: boolean }> = ({ onSubmit, isPreSchool }) => {
   const [form, setForm] = useState({ wakeUp: '', schoolStart: '', schoolEnd: '', lunchTime: '', dinnerTime: '', bedTime: '', napRoutines: [{ activity: '', startTime: '', endTime: '' }], tuitionRoutines: [{ subject: '', startTime: '', endTime: '' }], eveningRoutines: [{ activity: '', startTime: '', endTime: '' }] });
-  const updateArray = (key: any, index: number, field: string, value: string) => { const copy = [...(form as any)[key]]; copy[index][field] = value; setForm({ ...form, [key]: copy }); };
   const isComplete = form.wakeUp && form.schoolStart && form.schoolEnd && form.lunchTime && form.dinnerTime && form.bedTime;
   return (
     <div className="mt-4 space-y-3">
       <div className="grid grid-cols-2 gap-2"><TimeSelect label="Wake Up" value={form.wakeUp} onChange={v => setForm({...form, wakeUp: v})} /><TimeSelect label="Bed Time" value={form.bedTime} onChange={v => setForm({...form, bedTime: v})} /></div>
       <div className="grid grid-cols-2 gap-2"><TimeSelect label="School Start" value={form.schoolStart} onChange={v => setForm({...form, schoolStart: v})} /><TimeSelect label="School End" value={form.schoolEnd} onChange={v => setForm({...form, schoolEnd: v})} /></div>
-      <button disabled={!isComplete} onClick={() => onSubmit({...form, schoolHours: `${form.schoolStart} to ${form.schoolEnd}`})} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2">Confirm Routine</button>
+      <button disabled={!isComplete} onClick={() => onSubmit(form)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2">Confirm Routine</button>
     </div>
   );
 };
