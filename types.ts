@@ -35,7 +35,6 @@ export interface ChatState {
     weight?: string;
     goal?: string;
   };
-  // Updated to allow arrays for complex routines (naps, tuitions, etc.)
   answers: Record<string, any>; 
   currentQuestionIndex: number;
 }
@@ -58,6 +57,5 @@ export interface UserProfile {
   schoolId: string;
   phone: string;
   password?: string;
-  // Allows for complex activity objects saved in the user profile
   routine?: Record<string, any>; 
 }
