@@ -17,9 +17,25 @@ const PRE_SCHOOL_CLASSES = ['Playgroup', 'Nursery', 'LKG', 'UKG'];
 const generateTimeOptions = () => {
   const times: string[] = [];
   const addTime = (h: number, m: string, p: string) => times.push(`${h}:${m} ${p}`);
-  for(let h=5; h<=11; h++) { addTime(h, '00', 'AM'); addTime(h, '15', 'AM'); addTime(h, '30', 'AM'); addTime(h, '45', 'AM'); }
-  addTime(12, '00', 'PM'); addTime(12, '15', 'PM'); addTime(12, '30', 'PM'); addTime(12, '45', 'PM');
-  for(let h=1; h<=11; h++) { addTime(h, '00', 'PM'); addTime(h, '15', 'PM'); addTime(h, '30', 'PM'); addTime(h, '45', 'PM'); }
+
+  for(let h=5; h<=11; h++) {
+      addTime(h, '00', 'AM');
+      addTime(h, '15', 'AM');
+      addTime(h, '30', 'AM');
+      addTime(h, '45', 'AM');
+  }
+  
+  addTime(12, '00', 'PM');
+  addTime(12, '15', 'PM');
+  addTime(12, '30', 'PM');
+  addTime(12, '45', 'PM');
+
+  for(let h=1; h<=11; h++) {
+      addTime(h, '00', 'PM');
+      addTime(h, '15', 'PM');
+      addTime(h, '30', 'PM');
+      addTime(h, '45', 'PM');
+  }
   return times;
 };
 
@@ -394,30 +410,106 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
       const ph = doc.internal.pageSize.getHeight();
+      
       let primaryRGB: [number, number, number] = [79, 70, 229];
+      let lightRGB: [number, number, number] = [240, 244, 255]; 
       let planTitle = "SUCCESS ROADMAP";
       
-      if (state.branch?.includes('DIET')) primaryRGB = [225, 29, 72];
-      else if (state.branch?.includes('WELLNESS')) primaryRGB = [16, 185, 129];
+      if (state.branch?.includes('DIET') || state.branch?.includes('NUTRITION')) {
+          primaryRGB = [225, 29, 72];
+          lightRGB = [255, 241, 242];
+          planTitle = "PERSONALIZED DIET & NUTRITION PLAN";
+      } else if (state.branch?.includes('WELLNESS')) {
+          primaryRGB = [16, 185, 129];
+          lightRGB = [236, 253, 245];
+          planTitle = "STUDENT WELLNESS & MINDSET PLAN";
+      } else if (state.branch?.includes('DAILY_ROUTINE')) {
+          primaryRGB = [37, 99, 235];
+          lightRGB = [239, 246, 255];
+          planTitle = "PRE-SCHOOL DAILY ROUTINE";
+      } else if (state.branch?.includes('STUDY')) {
+          planTitle = "PERSONALIZED STUDY ROADMAP";
+      }
 
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.rect(0, 0, pw, 28, 'F');
+      
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'F'); 
-      doc.setFontSize(24); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
-      doc.text(cleanText(state.details.school).toUpperCase(), pw / 2, 32, { align: 'center' });
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'D');
+
+      doc.setFontSize(26);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      const schoolName = cleanText(state.details.school).toUpperCase() || "YOUR SCHOOL";
+      doc.text(schoolName, pw / 2, 35, { align: 'center' });
       
+      doc.setFontSize(9);
+      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+      doc.text('SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, 50, { align: 'center', charSpace: 1 });
+      
+      doc.setFillColor(248, 250, 252);
+      doc.rect(10, 68, pw - 20, 16, 'F');
+      doc.setFontSize(11);
+      doc.setTextColor(60);
+      const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}  |  AGE: ${cleanText(state.details.age)}YRS`;
+      doc.text(profile, pw / 2, 78, { align: 'center' });
+
+      doc.setFontSize(16);
+      doc.setTextColor(30);
+      doc.text(planTitle, pw / 2, 95, { align: 'center' });
+
       let y = 110;
+
       result.sections.forEach((sec, idx) => {
-        if (y > ph - 45) { doc.addPage(); y = 30; }
-        doc.setFontSize(14); doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+        if (y > ph - 45) {
+          doc.addPage();
+          y = 30;
+          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+          doc.rect(0, 0, 5, ph, 'F');
+        }
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
         doc.text(`${idx + 1}. ${cleanText(sec.heading).toUpperCase()}`, 18, y);
-        y += 12;
-        const content = Array.isArray(sec.content) ? sec.content.join('\n') : cleanText(sec.content);
-        const lines = doc.splitTextToSize(content, pw - 36);
-        doc.text(lines, 18, y);
-        y += (lines.length * 7.5) + 12;
+        y += 10;
+
+        const isTable = Array.isArray(sec.content) && sec.content.length > 0 && typeof sec.content[0] === 'object';
+        
+        if (isTable) {
+          const tableData = (sec.content as any[]).filter(row => row && typeof row === 'object');
+          autoTable(doc, {
+            startY: y,
+            head: [Object.keys(tableData[0]).map(k => k.toUpperCase())],
+            body: tableData.map((obj: any) => Object.values(obj).map(v => cleanText(v))),
+            theme: 'striped',
+            headStyles: { fillColor: primaryRGB, textColor: 255 },
+            alternateRowStyles: { fillColor: lightRGB },
+            margin: { left: 18, right: 18 }
+          });
+          y = (doc as any).lastAutoTable.finalY + 15;
+        } else {
+          doc.setFontSize(10.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(70, 70, 70);
+          const content = Array.isArray(sec.content) ? sec.content.join('\n') : cleanText(sec.content);
+          const lines = doc.splitTextToSize(content, pw - 36);
+          doc.text(lines, 18, y);
+          y += (lines.length * 7.5) + 12;
+        }
       });
+
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text(`SMART BUDDY ULTRA-CORE REPORT © 2026 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
+      }
+
       doc.save(`${state.details.name.replace(/\s+/g, '_')}_Plan.pdf`);
     } catch (err) { console.error(err); }
   };
@@ -484,7 +576,10 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
           <div ref={scrollRef} />
         </div>
 
-        {state.step === 'BRANCH_QUESTIONS' && !QUESTIONS[state.branch!][state.currentQuestionIndex]?.options.length && (
+        {/* Updated condition to hide input box during subject selection */}
+        {state.step === 'BRANCH_QUESTIONS' && 
+         !QUESTIONS[state.branch!][state.currentQuestionIndex]?.options.length && 
+         !(state.branch === 'SCHOOL_STUDY' && QUESTIONS['SCHOOL_STUDY'][state.currentQuestionIndex]?.key === 'difficultSubjects') && (
           <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
             <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Type your answer..." onKeyDown={(e) => e.key === 'Enter' && userInput && (handleChoice(userInput), setUserInput(''))} className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-indigo-400 font-bold" />
             <button onClick={() => userInput && (handleChoice(userInput), setUserInput(''))} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition"><i className="fa-solid fa-paper-plane"></i></button>
