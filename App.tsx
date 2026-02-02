@@ -17,28 +17,9 @@ const PRE_SCHOOL_CLASSES = ['Playgroup', 'Nursery', 'LKG', 'UKG'];
 const generateTimeOptions = () => {
   const times: string[] = [];
   const addTime = (h: number, m: string, p: string) => times.push(`${h}:${m} ${p}`);
-
-  // Morning 5 AM to 11 AM
-  for(let h=5; h<=11; h++) {
-      addTime(h, '00', 'AM');
-      addTime(h, '15', 'AM');
-      addTime(h, '30', 'AM');
-      addTime(h, '45', 'AM');
-  }
-  
-  // Noon 12 PM
-  addTime(12, '00', 'PM');
-  addTime(12, '15', 'PM');
-  addTime(12, '30', 'PM');
-  addTime(12, '45', 'PM');
-
-  // Afternoon/Evening 1 PM to 11 PM
-  for(let h=1; h<=11; h++) {
-      addTime(h, '00', 'PM');
-      addTime(h, '15', 'PM');
-      addTime(h, '30', 'PM');
-      addTime(h, '45', 'PM');
-  }
+  for(let h=5; h<=11; h++) { addTime(h, '00', 'AM'); addTime(h, '15', 'AM'); addTime(h, '30', 'AM'); addTime(h, '45', 'AM'); }
+  addTime(12, '00', 'PM'); addTime(12, '15', 'PM'); addTime(12, '30', 'PM'); addTime(12, '45', 'PM');
+  for(let h=1; h<=11; h++) { addTime(h, '00', 'PM'); addTime(h, '15', 'PM'); addTime(h, '30', 'PM'); addTime(h, '45', 'PM'); }
   return times;
 };
 
@@ -111,12 +92,6 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
     return stored ? JSON.parse(stored) : {};
   };
 
-  const saveUser = (user: UserProfile) => {
-    const users = getUsers();
-    users[user.phone] = user;
-    localStorage.setItem('smart_buddy_users', JSON.stringify(users));
-  };
-
   const handleSignup = () => {
     if (!form.name || !form.age || !form.className || !form.schoolId || !form.phone || !form.password) {
       setError('All fields are required.');
@@ -132,15 +107,10 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       return;
     }
 
-    const newUser: UserProfile = {
-      name: form.name,
-      age: form.age,
-      className: form.className,
-      schoolId: form.schoolId,
-      phone: form.phone,
-      password: form.password
-    };
-    saveUser(newUser);
+    const newUser: UserProfile = { name: form.name, age: form.age, className: form.className, schoolId: form.schoolId, phone: form.phone, password: form.password };
+    const allUsers = getUsers();
+    allUsers[newUser.phone] = newUser;
+    localStorage.setItem('smart_buddy_users', JSON.stringify(allUsers));
     onLogin(newUser);
   };
 
@@ -171,7 +141,7 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedOtp(code);
     setOtpSent(true);
-    alert(`Smart Buddy Security OTP: ${code}`); // Simulator
+    alert(`Smart Buddy Security OTP: ${code}`);
   };
 
   const verifyOtpAndReset = () => {
@@ -196,9 +166,6 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       setOtpSent(false);
       setPasswordResetStage(false);
   };
-
-
-
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
@@ -296,11 +263,10 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIPlanOutput | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const addMessage = (msg: Omit<ChatMessage, 'id'>) => {
     setMessages(prev => [...prev, { ...msg, id: Math.random().toString(36).substr(2, 9) }]);
@@ -316,41 +282,23 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   };
 
   const handleStart = () => {
-    // CHECK IF ROUTINE EXISTS IN USER PROFILE
     if (user.routine && Object.keys(user.routine).length > 0) {
-      // Routine exists: Jump to Main Choice
-      const greetingText = `Welcome back, ${user.name}! I remember your daily routine. How can I help you improve today?`;
-      addMessage({ sender: 'bot', text: greetingText, type: 'text' });
-      
+      addMessage({ sender: 'bot', text: `Welcome back, ${user.name}! I remember your daily routine. How can I help you improve today?` });
       showMainOptions();
-      
-      setState(prev => ({ 
-        ...prev, 
-        step: 'MAIN_CHOICE',
-        answers: { ...prev.answers, ...user.routine } // Load saved routine into answers
-      }));
-
+      setState(prev => ({ ...prev, step: 'MAIN_CHOICE', answers: { ...prev.answers, ...user.routine } }));
     } else {
-      // Routine does not exist: Ask for it
-      const greetingText = `Welcome, ${user.name}! I’m your Smart Buddy — your mentor & friend. To help me serve you best, please share your current daily routine. I will save this for your future visits.`;
-      addMessage({ sender: 'bot', text: greetingText, type: 'text' });
+      addMessage({ sender: 'bot', text: `Welcome, ${user.name}! I’m your Smart Buddy — your mentor & friend. To help me serve you best, please share your current daily routine.`, type: 'text' });
       addMessage({ sender: 'bot', text: "Please fill in your typical daily schedule below.", type: 'routine' });
       setState(prev => ({ ...prev, step: 'COLLECTING_ROUTINE' }));
     }
   };
 
-  const handleRoutineSubmit = (routineData: Record<string, string>) => {
-    // Save routine to Chat State
-    const updatedAnswers = { ...state.answers, ...routineData };
-    
-    // SAVE ROUTINE TO BACKEND (LocalStorage) via User Profile
+  const handleRoutineSubmit = (routineData: Record<string, any>) => {
     const updatedUser: UserProfile = { ...user, routine: routineData };
     onUpdateUser(updatedUser);
-
     addMessage({ sender: 'bot', text: "Thanks! I've saved your routine." });
-    
     showMainOptions();
-    setState(prev => ({ ...prev, answers: updatedAnswers, step: 'MAIN_CHOICE' }));
+    setState(prev => ({ ...prev, answers: { ...prev.answers, ...routineData }, step: 'MAIN_CHOICE' }));
   };
 
   const handleChoice = (option: string) => {
@@ -359,41 +307,49 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
     if (state.step === 'MAIN_CHOICE') {
       let branch: UserBranch;
       let botResponse = '';
-
-      if (option === 'Daily routine support') { branch = 'PRE_DAILY_ROUTINE'; botResponse = "Let's create a perfect daily routine for your child. I have a few quick questions."; }
-      else if (option === 'Nutrition and immunity wellness tips') { branch = 'PRE_NUTRITION'; botResponse = "Nutrition is key! I'll ask a few simple questions about eating habits."; }
+      if (option === 'Daily routine support') { branch = 'PRE_DAILY_ROUTINE'; botResponse = "Let's create a perfect daily routine."; }
+      else if (option === 'Nutrition and immunity wellness tips') { branch = 'PRE_NUTRITION'; botResponse = "Nutrition is key!"; }
       else if (option === 'Personalized Study Plan') { branch = 'SCHOOL_STUDY'; botResponse = "Awesome! Let’s build your personalized study plan."; }
-      else if (option === 'Personalized Diet Plan') { branch = 'SCHOOL_DIET'; botResponse = "Great choice! A healthy diet helps you stay active and focused."; }
-      else { branch = 'SCHOOL_WELLNESS'; botResponse = "I’m glad you care about your wellness! Let's explore some mindset strategies."; }
+      else if (option === 'Personalized Diet Plan') { branch = 'SCHOOL_DIET'; botResponse = "Great choice!"; }
+      else { branch = 'SCHOOL_WELLNESS'; botResponse = "I’m glad you care about your wellness!"; }
 
-      addMessage({ sender: 'bot', text: botResponse });
-      
-      // Skip COLLECTING_DETAILS and go straight to BRANCH_QUESTIONS
-      // Initialize question index
+      addMessage({ sender: 'bot', text: botResponse, type: 'text' as const });
       setState(prev => ({ ...prev, branch, step: 'BRANCH_QUESTIONS', currentQuestionIndex: 0 }));
 
-      // Trigger first question
       const firstQ = QUESTIONS[branch][0];
-      setTimeout(() => {
-        addMessage({ sender: 'bot', text: firstQ.q, options: firstQ.options, type: firstQ.options.length ? 'choice' : 'text' });
-      }, 500);
+      setTimeout(() => { addMessage({ sender: 'bot', text: firstQ.q, options: firstQ.options, type: firstQ.options.length ? 'choice' : 'text' }); }, 500);
 
     } else if (state.step === 'BRANCH_QUESTIONS') {
       const branch = state.branch!;
       const qs = QUESTIONS[branch];
       const currentQuestion = qs[state.currentQuestionIndex];
       const answerKey = currentQuestion.key;
-      
+
+      if (branch === 'SCHOOL_STUDY' && answerKey === 'difficultSubjects') {
+        const currentList = (state.answers['currentSubjects'] || "").split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => s !== "");
+        const inputList = option.split(',').map(s => s.trim().toLowerCase()).filter(s => s !== "");
+        const invalid = inputList.filter(s => !currentList.includes(s));
+        if (invalid.length > 0) {
+          addMessage({ sender: 'bot', text: `Oops! I can only focus on subjects from your current list: ${state.answers['currentSubjects']}` });
+          return;
+        }
+      }
+
       const nextIndex = state.currentQuestionIndex + 1;
-      setState(prev => ({ 
-        ...prev, 
-        answers: { ...prev.answers, [answerKey]: option },
-        currentQuestionIndex: nextIndex 
-      }));
+      const updatedAnswers = { ...state.answers, [answerKey]: option };
+      setState(prev => ({ ...prev, answers: updatedAnswers, currentQuestionIndex: nextIndex }));
 
       if (nextIndex < qs.length) {
         const nextQ = qs[nextIndex];
-        addMessage({ sender: 'bot', text: nextQ.q, options: nextQ.options, type: nextQ.options.length ? 'choice' : 'text' });
+        let finalOptions = nextQ.options;
+        let finalType: any = nextQ.options.length ? 'choice' : 'text';
+
+        if (branch === 'SCHOOL_STUDY' && nextQ.key === 'difficultSubjects') {
+          finalOptions = (updatedAnswers['currentSubjects'] || "").split(',').map((s: string) => s.trim()).filter((s: string) => s !== "");
+          finalType = 'choice';
+        }
+
+        addMessage({ sender: 'bot', text: nextQ.q, options: finalOptions, type: finalType });
       } else {
         processResults();
       }
@@ -403,26 +359,20 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   const processResults = async () => {
     setState(prev => ({ ...prev, step: 'GENERATING' }));
     setLoading(true);
-    addMessage({ sender: 'bot', text: `Thank you, ${state.details.name}! I am now analyzing your details to build your specialized plan based on Ultra-Core requirements...` });
-    
+    addMessage({ sender: 'bot', text: `Analyzing details to build your plan...` });
     try {
       const plan = await generateSmartBuddyPlan(state);
       setResult(plan);
       setState(prev => ({ ...prev, step: 'COMPLETED' }));
-      addMessage({ sender: 'bot', text: 'I have finished your personalized plan! You can download your specialized report below.', type: 'download' });
-    } catch (err: any) {
-      // Display message from service
-      addMessage({ sender: 'bot', text: err.message || 'I encountered a small glitch. Please try restarting!' });
-    } finally {
-      setLoading(false);
-    }
+      addMessage({ sender: 'bot', text: 'Your plan is ready! Download below.', type: 'download' as const });
+    } catch (err: any) { addMessage({ sender: 'bot', text: 'I encountered a small glitch.' }); }
+    finally { setLoading(false); }
   };
 
   const cleanText = (text: any): string => {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') return String(text);
-    const cleaned = text.replace(/^\["|", "|^\[|\]$|"\]$|^"|"$/g, '').replace(/\*\*/g, '').trim();
-    return cleaned === 'undefined' ? '' : cleaned;
+    return text.replace(/^\["|", "|^\[|\]$|"\]$|^"|"$/g, '').replace(/\*\*/g, '').trim();
   };
 
   const downloadPDF = () => {
@@ -431,6 +381,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
       const ph = doc.internal.pageSize.getHeight();
+      
       let primaryRGB: [number, number, number] = [79, 70, 229];
       let lightRGB: [number, number, number] = [240, 244, 255]; 
       let planTitle = "SUCCESS ROADMAP";
@@ -460,246 +411,133 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       doc.setLineWidth(0.5);
       doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'D');
 
-      doc.setFontSize(30);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 30, 30);
-      
+      doc.setFontSize(26); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
       const schoolName = cleanText(state.details.school).toUpperCase() || "YOUR SCHOOL";
       const titleLines = doc.splitTextToSize(schoolName, pw - 40);
+      doc.text(titleLines, pw / 2, 35, { align: 'center' });
       
-      let titleY = 32;
-      if (titleLines.length > 1) titleY = 28;
-      if (titleLines.length > 2) titleY = 24;
-
-      doc.text(titleLines, pw / 2, titleY, { align: 'center' });
+      doc.setFontSize(9); doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+      doc.text('SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, 58, { align: 'center', charSpace: 1 });
       
-      const subTitleY = titleY + (titleLines.length * 11) + 1;
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
-      
-      doc.setFillColor(248, 250, 252);
-      doc.rect(10, 68, pw - 20, 16, 'F');
-      doc.setDrawColor(220);
-      doc.line(10, 68, pw - 10, 68);
-      doc.line(10, 84, pw - 10, 84);
-      
-      doc.setFontSize(11);
-      doc.setTextColor(60);
-      doc.setFont('helvetica', 'bold');
+      doc.setFillColor(248, 250, 252); doc.rect(10, 68, pw - 20, 16, 'F');
+      doc.setFontSize(11); doc.setTextColor(60);
       const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}  |  AGE: ${cleanText(state.details.age)}YRS`;
       doc.text(profile, pw / 2, 78, { align: 'center' });
 
-      doc.setFontSize(16);
-      doc.setTextColor(30);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16); doc.setTextColor(30);
       doc.text(planTitle, pw / 2, 95, { align: 'center' });
 
       let y = 110;
-
       result.sections.forEach((sec, idx) => {
-        if (y > ph - 45) {
-          doc.addPage();
-          y = 30;
-          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-          doc.rect(0, 0, 8, ph, 'F');
-        }
+        if (y > ph - 45) { doc.addPage(); y = 30; doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); doc.rect(0, 0, 5, ph, 'F'); }
 
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
         
-        // Fix: Strip existing numbering from AI output (e.g., "1. Introduction" -> "Introduction")
-        // preventing double numbering like "1. 1. Introduction"
-        const cleanHeading = cleanText(sec.heading).replace(/^\d+[\.\)\s]+\s*/, ''); 
+        // Fix double numbering
+        const rawHeading = cleanText(sec.heading);
+        const cleanHeading = rawHeading.replace(/^[\d\.\)\s]+/, '').trim(); 
         const headerText = `${idx + 1}. ${cleanHeading.toUpperCase()}`;
         
         doc.text(headerText, 18, y);
+        
+        // --- ADD UNDERLINE START ---
         const textWidth = doc.getTextWidth(headerText);
-        y += 2.5;
+        const lineY = y + 2; 
         doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-        doc.setLineWidth(1.2);
-        doc.line(18, y, 18 + textWidth, y);
-        doc.setLineWidth(0.2); 
+        doc.setLineWidth(0.8);
+        doc.line(18, lineY, 18 + textWidth, lineY);
+        doc.setLineWidth(0.2); // Reset line width
+        // --- ADD UNDERLINE END ---
+
         y += 12;
-
-        doc.setFontSize(10.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(70, 70, 70);
-
         const isTable = Array.isArray(sec.content) && sec.content.length > 0 && typeof sec.content[0] === 'object';
-        const isList = Array.isArray(sec.content) && (sec.content.length === 0 || typeof sec.content[0] === 'string');
-
         if (isTable) {
           const tableData = (sec.content as any[]).filter(row => row && typeof row === 'object');
-          if (tableData.length > 0) {
-            const headKeys = Object.keys(tableData[0]);
-            const headLabels = headKeys.map(k => k.replace(/([A-Z])/g, ' $1').toUpperCase());
-            const body = tableData.map((obj: any) => headKeys.map(k => cleanText(obj[k])));
-            autoTable(doc, {
-              startY: y,
-              head: [headLabels],
-              body: body,
-              margin: { left: 18, right: 18 },
-              theme: 'striped',
-              headStyles: { fillColor: primaryRGB, textColor: 255, fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 4 },
-              styles: { fontSize: 8.5, cellPadding: 4, valign: 'middle', textColor: 50, lineColor: [240, 240, 240], lineWidth: 0.1 },
-              alternateRowStyles: { fillColor: lightRGB },
-            });
-            y = (doc as any).lastAutoTable.finalY + 18;
-          }
-        } else if (isList) {
-          const listItems = sec.content as string[];
-          listItems.forEach(item => {
-            if (y > ph - 22) { doc.addPage(); y = 30; doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); doc.rect(0,0,8,ph,'F'); }
-            const cleaned = cleanText(item);
-            if (!cleaned) return;
-            doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-            doc.circle(21, y - 1.2, 0.6, 'F'); 
-            const lines = doc.splitTextToSize(cleaned, pw - 48);
-            doc.text(lines, 26, y);
-            y += (lines.length * 7) + 3;
-          });
-          y += 8;
+          autoTable(doc, { startY: y, head: [Object.keys(tableData[0]).map(k => k.toUpperCase())], body: tableData.map((obj: any) => Object.values(obj).map(v => cleanText(v))), theme: 'striped', headStyles: { fillColor: primaryRGB }, alternateRowStyles: { fillColor: lightRGB }, margin: { left: 18, right: 18 } });
+          y = (doc as any).lastAutoTable.finalY + 15;
         } else {
-          const rawText = typeof sec.content === 'string' ? sec.content : JSON.stringify(sec.content);
-          const cleanedText = cleanText(rawText);
-          const lines = doc.splitTextToSize(cleanedText, pw - 36);
-          doc.text(lines, 18, y, { lineHeightFactor: 1.5 });
+          doc.setFontSize(10.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(70, 70, 70);
+          const content = Array.isArray(sec.content) ? sec.content.join('\n') : cleanText(sec.content);
+          const lines = doc.splitTextToSize(content, pw - 36);
+          doc.text(lines, 18, y);
           y += (lines.length * 7.5) + 12;
         }
       });
 
-      if (y > ph - 55) { doc.addPage(); y = 30; doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); doc.rect(0,0,8,ph,'F'); }
-      doc.setFillColor(lightRGB[0], lightRGB[1], lightRGB[2]);
-      doc.roundedRect(15, y, pw - 30, 35, 2, 2, 'F');
-      doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(15, y, pw - 30, 35, 2, 2, 'D');
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('A Personal Message from your Smart Buddy:', 20, y + 10);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(80, 80, 80);
-      const summaryLines = doc.splitTextToSize(cleanText(result.summary || ""), pw - 45);
-      doc.text(summaryLines, 20, y + 18, { lineHeightFactor: 1.3 });
-
       const pageCount = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i);
-          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-          doc.rect(0, 0, 5, ph, 'F');
-          doc.setFontSize(7.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(180, 180, 180);
-          doc.text(`SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
+          doc.setFontSize(8); doc.setTextColor(150);
+          doc.text(`SMART BUDDY ULTRA-CORE REPORT © 2026 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
       }
-      doc.save(`${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`);
-    } catch (err) {
-      console.error("PDF Generation Error:", err);
-      alert("Something went wrong while generating the PDF. Please try again or check the console.");
-    }
+      doc.save(`${state.details.name.replace(/\s+/g, '_')}_Plan.pdf`);
+    } catch (err) { console.error("PDF Error:", err); }
   };
-
-  useEffect(() => { handleStart(); }, []);
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-white h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white">
-        
         <div className="bg-indigo-600 p-6 flex items-center gap-4 text-white shadow-lg relative z-10">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl">
-            <i className="fa-solid fa-robot-astronomer"></i>
-          </div>
-          <div>
-            <h1 className="font-black text-xl tracking-tight">Smart Buddy</h1>
-            <p className="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Mentor & Friend</p>
-          </div>
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl"><i className="fa-solid fa-robot-astronomer"></i></div>
+          <div><h1 className="font-black text-xl tracking-tight">Smart Buddy</h1><p className="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Mentor & Friend</p></div>
           <button onClick={onLogout} className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition">Logout</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth bg-slate-50">
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-              <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm font-medium leading-relaxed ${
-                m.sender === 'user' 
-                ? 'bg-indigo-600 text-white rounded-tr-none' 
-                : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
-              }`}>
+              <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm font-medium leading-relaxed ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
                 {m.text}
                 
                 {m.type === 'choice' && m.options && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {m.options.map(opt => (
-                      <button 
-                        key={opt}
-                        onClick={() => handleChoice(opt)}
-                        className="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-600 hover:text-white transition-all font-bold"
-                      >
-                        {opt}
-                      </button>
-                    ))}
+                    {(() => {
+                      const isMultiSelect = state.branch === 'SCHOOL_STUDY' && 
+                                           QUESTIONS['SCHOOL_STUDY'][state.currentQuestionIndex]?.key === 'difficultSubjects' &&
+                                           messages[messages.length - 1].id === m.id;
+                      return (
+                        <>
+                          {isMultiSelect && (
+                            <button onClick={() => selectedOptions.length === m.options!.length ? setSelectedOptions([]) : setSelectedOptions(m.options!)} className="w-full text-left ml-1 mb-1 text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-600 transition">
+                              {selectedOptions.length === m.options!.length ? 'Deselect All' : 'Select All Subjects'}
+                            </button>
+                          )}
+                          {m.options.map(opt => {
+                            const isSelected = selectedOptions.includes(opt);
+                            return (
+                              <button key={opt} onClick={() => isMultiSelect ? setSelectedOptions(prev => prev.includes(opt) ? prev.filter(i => i !== opt) : [...prev, opt]) : handleChoice(opt)} className={`px-4 py-2 rounded-xl border transition-all font-bold ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'}`}>
+                                {opt} {isSelected && <i className="fa-solid fa-check ml-2"></i>}
+                              </button>
+                            );
+                          })}
+                          {isMultiSelect && selectedOptions.length > 0 && (
+                            <button onClick={() => { handleChoice(selectedOptions.join(', ')); setSelectedOptions([]); }} className="w-full mt-3 py-4 bg-emerald-500 text-white rounded-xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition flex items-center justify-center gap-2">
+                              <i className="fa-solid fa-circle-check"></i> Confirm Selection ({selectedOptions.length})
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
-                {m.type === 'routine' && state.step === 'COLLECTING_ROUTINE' && (
-                  <RoutineForm 
-                    onSubmit={handleRoutineSubmit}
-                    isPreSchool={PRE_SCHOOL_CLASSES.includes(user.className)}
-                  />
-                )}
-
+                {m.type === 'routine' && <RoutineForm onSubmit={handleRoutineSubmit} isPreSchool={PRE_SCHOOL_CLASSES.includes(user.className)} />}
                 {m.type === 'download' && result && (
                   <div className="mt-4">
-                    <button 
-                      onClick={downloadPDF}
-                      className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
-                    >
-                      <i className="fa-solid fa-file-pdf"></i> Download Ultra-Core Success Plan
-                    </button>
-                    <button 
-                      onClick={() => window.location.reload()}
-                      className="w-full mt-2 py-2 text-slate-400 font-bold text-xs hover:text-slate-600"
-                    >
-                      Start New Analysis
-                    </button>
+                    <button onClick={downloadPDF} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"><i className="fa-solid fa-file-pdf"></i> Download Ultra-Core Success Plan</button>
                   </div>
                 )}
               </div>
             </div>
           ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-slate-100 p-4 rounded-2xl flex gap-2 items-center shadow-sm">
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-75"></div>
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-150"></div>
-              </div>
-            </div>
-          )}
           <div ref={scrollRef} />
         </div>
 
-        {state.step === 'BRANCH_QUESTIONS' && !QUESTIONS[state.branch!][state.currentQuestionIndex]?.options.length && (
+        {state.step === 'BRANCH_QUESTIONS' && !QUESTIONS[state.branch!][state.currentQuestionIndex]?.options.length && 
+         !(state.branch === 'SCHOOL_STUDY' && QUESTIONS['SCHOOL_STUDY'][state.currentQuestionIndex]?.key === 'difficultSubjects') && (
           <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-            <input 
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder="Type your answer..."
-              onKeyDown={(e) => e.key === 'Enter' && userInput && (handleChoice(userInput), setUserInput(''))}
-              className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-indigo-400 font-bold"
-            />
-            <button 
-              onClick={() => userInput && (handleChoice(userInput), setUserInput(''))}
-              className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition"
-            >
-              <i className="fa-solid fa-paper-plane"></i>
-            </button>
+            <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Type your answer..." onKeyDown={(e) => e.key === 'Enter' && userInput && (handleChoice(userInput), setUserInput(''))} className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-indigo-400 font-bold" />
+            <button onClick={() => userInput && (handleChoice(userInput), setUserInput(''))} className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition"><i className="fa-solid fa-paper-plane"></i></button>
           </div>
         )}
       </div>
@@ -707,369 +545,39 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
   );
 };
 
-const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
-  <div className="space-y-1">
-    <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>
-    <div className="relative">
-      <select 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">Select Time</option>
-        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-      </select>
-      <i className="fa-solid fa-clock absolute right-3 top-3.5 text-slate-300 pointer-events-none"></i>
-    </div>
+const TimeSelect: React.FC<{ label?: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
+  <div className="space-y-1 flex-1">
+    {label && <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>}
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none">
+      <option value="">Select Time</option>
+      {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+    </select>
   </div>
 );
 
-type NapRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
+type NapRoutine = { activity: string; startTime: string; endTime: string; };
+type TuitionRoutine = { subject: string; startTime: string; endTime: string; };
+type EveningRoutine = { activity: string; startTime: string; endTime: string; };
+type FormState = { wakeUp: string; schoolStart: string; schoolEnd: string; lunchTime: string; dinnerTime: string; bedTime: string; napRoutines: NapRoutine[]; tuitionRoutines: TuitionRoutine[]; eveningRoutines: EveningRoutine[]; };
 
-type TuitionRoutine = {
-  subject: string;
-  startTime: string;
-  endTime: string;
-};
-
-type EveningRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
-
-type FormState = {
-  wakeUp: string;
-  schoolStart: string;
-  schoolEnd: string;
-  lunchTime: string;
-  dinnerTime: string;
-  bedTime: string;
-  napRoutines: NapRoutine[];
-  tuitionRoutines: TuitionRoutine[];
-  eveningRoutines: EveningRoutine[];
-};
-
-
-const RoutineForm: React.FC<{
-  onSubmit: (d: Record<string, string>) => void,
-  isPreSchool: boolean
-}> = ({ onSubmit, isPreSchool }) => {
- const [form, setForm] = useState<FormState>({
-  wakeUp: '',
-  schoolStart: '',
-  schoolEnd: '',
-  lunchTime: '',
-  dinnerTime: '',
-  bedTime: '',
-  napRoutines: [{ activity: '', startTime: '', endTime: '' }],
-  tuitionRoutines: [{ subject: '', startTime: '', endTime: '' }],
-  eveningRoutines: [{ activity: '', startTime: '', endTime: '' }]
-});
-
-const updateArray = <T,>(
-  key: keyof FormState,
-  index: number,
-  field: keyof T,
-  value: string
-) => {
-  const copy = [...(form[key] as T[])];
-  copy[index][field] = value;
-  setForm({ ...form, [key]: copy });
-};
-
-const schoolHours =
-  form.schoolStart && form.schoolEnd
-    ? `${form.schoolStart} to ${form.schoolEnd}`
-    : "";
-
-
-const handleSubmit = () => {
-  onSubmit({
-    ...form,
-    schoolHours
-  });
-};
-
-
-  const isComplete = form.wakeUp && schoolHours && form.lunchTime && form.dinnerTime && form.bedTime;
-
+const RoutineForm: React.FC<{ onSubmit: (d: Record<string, any>) => void, isPreSchool: boolean }> = ({ onSubmit, isPreSchool }) => {
+  const [form, setForm] = useState<FormState>({ wakeUp: '', schoolStart: '', schoolEnd: '', lunchTime: '', dinnerTime: '', bedTime: '', napRoutines: [{ activity: '', startTime: '', endTime: '' }], tuitionRoutines: [{ subject: '', startTime: '', endTime: '' }], eveningRoutines: [{ activity: '', startTime: '', endTime: '' }] });
+  const updateArray = (key: keyof FormState, index: number, field: string, value: string) => { const copy = [...(form[key] as any)]; copy[index][field] = value; setForm({ ...form, [key]: copy }); };
+  const isComplete = form.wakeUp && form.schoolStart && form.schoolEnd && form.lunchTime && form.dinnerTime && form.bedTime;
   return (
     <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Wake Up Time" value={form.wakeUp} onChange={v => setForm({...form, wakeUp: v})} />
-        <TimeSelect label="Bed Time" value={form.bedTime} onChange={v => setForm({...form, bedTime: v})} />
-      </div>
-      
-  <div className="space-y-1">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    School Hours
-  </label>
-
-  <div className="grid grid-cols-2 gap-2">
-    <div className="relative">
-      <select
-        value={form.schoolStart}
-        onChange={e =>
-          setForm({ ...form, schoolStart: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">Start</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-
-    <div className="relative">
-      <select
-        value={form.schoolEnd}
-        onChange={e =>
-          setForm({ ...form, schoolEnd: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">End</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-  </div>
-</div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Lunch Time" value={form.lunchTime} onChange={v => setForm({...form, lunchTime: v})} />
-        <TimeSelect label="Dinner Time" value={form.dinnerTime} onChange={v => setForm({...form, dinnerTime: v})} />
-      </div>
-
-      <div className="space-y-3">
-       <label className="text-[10px] font-bold text-slate-500 uppercase">
-    {isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
-  </label>
-  
-{form.napRoutines.map((r, i) => (
-  <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-  
-    <input
-      value={r.activity}
-      onChange={e =>
-        updateArray<NapRoutine>(
-          "napRoutines",
-          i,
-          "activity",
-          e.target.value
-        )
-      }
-      placeholder={isPreSchool ? "Nap" : "After school"}
-      className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-    />
-
-    <TimeSelect
-      value={r.startTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "startTime", v)
-      }
-    />
-
-    <TimeSelect
-      value={r.endTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "endTime", v)
-      }
-    />
-  </div>
-))}
-
-<button
-  type="button"
-  onClick={() =>
-    setForm({
-      ...form,
-      napRoutines: [
-        ...form.napRoutines,
-        { activity: '', startTime: '', endTime: '' }
-      ]
-    })
-  }
-  className="text-xs font-bold text-blue-600"
->
-  + Add another
-</button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Tuition / Coaching?
-  </label>
-
-  {form.tuitionRoutines.map((r, i) => (
- 
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-
-      <input
-        value={r.subject}
-        onChange={e =>
-          updateArray<TuitionRoutine>(
-            "tuitionRoutines",
-            i,
-            "subject",
-            e.target.value
-          )
-        }
-        placeholder="Math tuition"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "endTime", v)
-        }
-      />
- 
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        tuitionRoutines: [
-          ...form.tuitionRoutines,
-          { subject: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Evening Activity
-  </label>
-
-  {form.eveningRoutines.map((r, i) => (
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-      <input
-        value={r.activity}
-        onChange={e =>
-          updateArray<EveningRoutine>(
-            "eveningRoutines",
-            i,
-            "activity",
-            e.target.value
-          )
-        }
-        placeholder="Playing"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "endTime", v)
-        }
-      />
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        eveningRoutines: [
-          ...form.eveningRoutines,
-          { activity: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-
-
-      <button 
-        disabled={!isComplete}
-        onClick={handleSubmit}
-        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2"
-      >
-        Confirm Routine
-      </button>
+      <div className="flex gap-2"><TimeSelect label="Wake Up" value={form.wakeUp} onChange={v => setForm({...form, wakeUp: v})} /><TimeSelect label="Bed Time" value={form.bedTime} onChange={v => setForm({...form, bedTime: v})} /></div>
+      <div className="flex gap-2"><TimeSelect label="School Start" value={form.schoolStart} onChange={v => setForm({...form, schoolStart: v})} /><TimeSelect label="School End" value={form.schoolEnd} onChange={v => setForm({...form, schoolEnd: v})} /></div>
+      <button disabled={!isComplete} onClick={() => onSubmit(form)} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2">Confirm Routine</button>
     </div>
   );
 };
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('smart_buddy_active_user');
-    if (savedUser) {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem('smart_buddy_active_user');
-      }
-    }
-  }, []);
-
-  const getUsers = () => {
-    const stored = localStorage.getItem('smart_buddy_users');
-    return stored ? JSON.parse(stored) : {};
-  };
-
-  const updateUser = (updatedUser: UserProfile) => {
-    const users = getUsers();
-    users[updatedUser.phone] = updatedUser;
-    localStorage.setItem('smart_buddy_users', JSON.stringify(users));
-    setCurrentUser(updatedUser);
-  };
-
-  const setCurrentUser = (u: UserProfile | null) => {
-      setUser(u);
-      if(u) localStorage.setItem('smart_buddy_active_user', JSON.stringify(u));
-      else localStorage.removeItem('smart_buddy_active_user');
-  };
-
-  return (
-    <>
-      {!user ? (
-        <AuthScreen onLogin={setCurrentUser} />
-      ) : (
-        <ChatScreen user={user} onLogout={() => setCurrentUser(null)} onUpdateUser={updateUser} />
-      )}
-    </>
-  );
+  useEffect(() => { const saved = localStorage.getItem('smart_buddy_active_user'); if (saved) setUser(JSON.parse(saved)); }, []);
+  const updateUser = (u: UserProfile) => { const users = JSON.parse(localStorage.getItem('smart_buddy_users') || '{}'); users[u.phone] = u; localStorage.setItem('smart_buddy_users', JSON.stringify(users)); localStorage.setItem('smart_buddy_active_user', JSON.stringify(u)); setUser(u); };
+  return !user ? <AuthScreen onLogin={u => { localStorage.setItem('smart_buddy_active_user', JSON.stringify(u)); setUser(u); }} /> : <ChatScreen user={user} onLogout={() => { localStorage.removeItem('smart_buddy_active_user'); setUser(null); }} onUpdateUser={updateUser} />;
 };
 
 export default App;
