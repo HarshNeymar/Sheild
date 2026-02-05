@@ -197,9 +197,6 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       setPasswordResetStage(false);
   };
 
-
-
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-white">
@@ -383,6 +380,29 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const qs = QUESTIONS[branch];
       const currentQuestion = qs[state.currentQuestionIndex];
       const answerKey = currentQuestion.key;
+
+      // --- VALIDATION: Check if difficult subjects are in the previously entered current subjects list ---
+      if (branch === 'SCHOOL_STUDY' && answerKey === 'difficultSubjects') {
+          const currentSubjectsRaw = state.answers['currentSubjects'] || '';
+          
+          // Helper to split and normalize strings (remove whitespace, lowercase, filter empty)
+          const normalizeList = (str: string) => str.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+          
+          const currentList = normalizeList(currentSubjectsRaw);
+          const difficultList = normalizeList(option);
+          
+          // Find subjects in difficult list that are NOT in current list
+          const invalidSubjects = difficultList.filter(d => !currentList.includes(d));
+          
+          if (invalidSubjects.length > 0) {
+              addMessage({ 
+                  sender: 'bot', 
+                  text: `Please verify your subjects. You listed "${invalidSubjects.join(', ')}" as difficult, but these weren't in your main subject list (${currentSubjectsRaw}). Please choose only from your current subjects.` 
+              });
+              return; // Halt progress until valid input is given
+          }
+      }
+      // --- END VALIDATION ---
       
       const nextIndex = state.currentQuestionIndex + 1;
       setState(prev => ({ 
@@ -724,299 +744,93 @@ const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string)
   </div>
 );
 
-type NapRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
-
-type TuitionRoutine = {
-  subject: string;
-  startTime: string;
-  endTime: string;
-};
-
-type EveningRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
-
-type FormState = {
-  wakeUp: string;
-  schoolStart: string;
-  schoolEnd: string;
-  lunchTime: string;
-  dinnerTime: string;
-  bedTime: string;
-  napRoutines: NapRoutine[];
-  tuitionRoutines: TuitionRoutine[];
-  eveningRoutines: EveningRoutine[];
-};
-
-
 const RoutineForm: React.FC<{
   onSubmit: (d: Record<string, string>) => void,
   isPreSchool: boolean
 }> = ({ onSubmit, isPreSchool }) => {
- const [form, setForm] = useState<FormState>({
-  wakeUp: '',
-  schoolStart: '',
-  schoolEnd: '',
-  lunchTime: '',
-  dinnerTime: '',
-  bedTime: '',
-  napRoutines: [{ activity: '', startTime: '', endTime: '' }],
-  tuitionRoutines: [{ subject: '', startTime: '', endTime: '' }],
-  eveningRoutines: [{ activity: '', startTime: '', endTime: '' }]
-});
-
-const updateArray = <T,>(
-  key: keyof FormState,
-  index: number,
-  field: keyof T,
-  value: string
-) => {
-  const copy = [...(form[key] as T[])];
-  copy[index][field] = value;
-  setForm({ ...form, [key]: copy });
-};
-
-const schoolHours =
-  form.schoolStart && form.schoolEnd
-    ? `${form.schoolStart} to ${form.schoolEnd}`
-    : "";
-
-
-const handleSubmit = () => {
-  onSubmit({
-    ...form,
-    schoolHours
+  const [r, setR] = useState({
+    wakeUp: '',
+    schoolHours: '',
+    lunchTime: '',
+    napRoutine: '',
+    tuitionTime: '',
+    eveningActivity: '',
+    dinnerTime: '',
+    bedTime: ''
   });
-};
 
+  const [schoolStart, setSchoolStart] = useState('');
+  const [schoolEnd, setSchoolEnd] = useState('');
 
-  const isComplete = form.wakeUp && schoolHours && form.lunchTime && form.dinnerTime && form.bedTime;
+  useEffect(() => {
+    if (schoolStart && schoolEnd) {
+      setR(prev => ({ ...prev, schoolHours: `${schoolStart} to ${schoolEnd}` }));
+    }
+  }, [schoolStart, schoolEnd]);
+
+  const handleSubmit = () => {
+    const submissionData = {
+      wakeUp: r.wakeUp,
+      schoolHours: r.schoolHours,
+      lunchTime: r.lunchTime,
+      napRoutine: isPreSchool ? r.napRoutine : '',
+      afterSchool: !isPreSchool ? r.napRoutine : '',
+      tuitionTime: r.tuitionTime,
+      eveningActivity: r.eveningActivity,
+      dinnerTime: r.dinnerTime,
+      bedTime: r.bedTime
+    };
+    onSubmit(submissionData);
+  };
+
+  const isComplete = r.wakeUp && r.schoolHours && r.lunchTime && r.dinnerTime && r.bedTime;
 
   return (
     <div className="mt-4 space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Wake Up Time" value={form.wakeUp} onChange={v => setForm({...form, wakeUp: v})} />
-        <TimeSelect label="Bed Time" value={form.bedTime} onChange={v => setForm({...form, bedTime: v})} />
+        <TimeSelect label="Wake Up Time" value={r.wakeUp} onChange={v => setR({...r, wakeUp: v})} />
+        <TimeSelect label="Bed Time" value={r.bedTime} onChange={v => setR({...r, bedTime: v})} />
       </div>
       
-  <div className="space-y-1">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    School Hours
-  </label>
-
-  <div className="grid grid-cols-2 gap-2">
-    <div className="relative">
-      <select
-        value={form.schoolStart}
-        onChange={e =>
-          setForm({ ...form, schoolStart: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">Start</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-
-    <div className="relative">
-      <select
-        value={form.schoolEnd}
-        onChange={e =>
-          setForm({ ...form, schoolEnd: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">End</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-  </div>
-</div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Lunch Time" value={form.lunchTime} onChange={v => setForm({...form, lunchTime: v})} />
-        <TimeSelect label="Dinner Time" value={form.dinnerTime} onChange={v => setForm({...form, dinnerTime: v})} />
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-slate-500 uppercase">School Hours</label>
+        <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+                <select value={schoolStart} onChange={e => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none">
+                    <option value="">Start</option>
+                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]"></i>
+            </div>
+            <div className="relative">
+                <select value={schoolEnd} onChange={e => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none">
+                    <option value="">End</option>
+                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]"></i>
+            </div>
+        </div>
       </div>
 
-      <div className="space-y-3">
-       <label className="text-[10px] font-bold text-slate-500 uppercase">
-    {isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
-  </label>
-  
-{form.napRoutines.map((r, i) => (
-  <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-  
-    <input
-      value={r.activity}
-      onChange={e =>
-        updateArray<NapRoutine>(
-          "napRoutines",
-          i,
-          "activity",
-          e.target.value
-        )
-      }
-      placeholder={isPreSchool ? "Nap" : "After school"}
-      className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-    />
+      <div className="grid grid-cols-2 gap-2">
+        <TimeSelect label="Lunch Time" value={r.lunchTime} onChange={v => setR({...r, lunchTime: v})} />
+        <TimeSelect label="Dinner Time" value={r.dinnerTime} onChange={v => setR({...r, dinnerTime: v})} />
+      </div>
 
-    <TimeSelect
-      value={r.startTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "startTime", v)
-      }
-    />
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-slate-500 uppercase">{isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}</label>
+        <input type="text" placeholder={isPreSchool ? "e.g. Nap from 2-4 PM" : "e.g. Rest & Snacks"} value={r.napRoutine} onChange={e => setR({...r, napRoutine: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
+      </div>
 
-    <TimeSelect
-      value={r.endTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "endTime", v)
-      }
-    />
-  </div>
-))}
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-slate-500 uppercase">Tuition / Coaching?</label>
+        <input type="text" placeholder="e.g. Math Tuition 5-6 PM (or None)" value={r.tuitionTime} onChange={e => setR({...r, tuitionTime: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
+      </div>
 
-<button
-  type="button"
-  onClick={() =>
-    setForm({
-      ...form,
-      napRoutines: [
-        ...form.napRoutines,
-        { activity: '', startTime: '', endTime: '' }
-      ]
-    })
-  }
-  className="text-xs font-bold text-blue-600"
->
-  + Add another
-</button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Tuition / Coaching?
-  </label>
-
-  {form.tuitionRoutines.map((r, i) => (
- 
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-
-      <input
-        value={r.subject}
-        onChange={e =>
-          updateArray<TuitionRoutine>(
-            "tuitionRoutines",
-            i,
-            "subject",
-            e.target.value
-          )
-        }
-        placeholder="Math tuition"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "endTime", v)
-        }
-      />
- 
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        tuitionRoutines: [
-          ...form.tuitionRoutines,
-          { subject: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Evening Activity
-  </label>
-
-  {form.eveningRoutines.map((r, i) => (
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-      <input
-        value={r.activity}
-        onChange={e =>
-          updateArray<EveningRoutine>(
-            "eveningRoutines",
-            i,
-            "activity",
-            e.target.value
-          )
-        }
-        placeholder="Playing"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "endTime", v)
-        }
-      />
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        eveningRoutines: [
-          ...form.eveningRoutines,
-          { activity: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold text-slate-500 uppercase">Evening Activity</label>
+        <input type="text" placeholder="e.g. Playing, TV, Homework" value={r.eveningActivity} onChange={e => setR({...r, eveningActivity: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
+      </div>
 
       <button 
         disabled={!isComplete}
