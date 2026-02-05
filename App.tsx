@@ -734,7 +734,7 @@ const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string)
       <select 
         value={value} 
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
+        className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none cursor-pointer"
       >
         <option value="">Select Time</option>
         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -744,17 +744,70 @@ const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string)
   </div>
 );
 
+// --- New Sub-Component for Dynamic Activities ---
+
+const DynamicActivityRow: React.FC<{
+  label: string,
+  activities: { name: string, start: string, end: string }[],
+  onAdd: () => void,
+  onChange: (index: number, field: string, value: string) => void,
+  placeholder: string
+}> = ({ label, activities, onAdd, onChange, placeholder }) => (
+  <div className="space-y-2 mb-4">
+    <div className="flex justify-between items-center px-1">
+      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{label}</label>
+      <button 
+        onClick={onAdd}
+        className="flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all group"
+      >
+        <span className="text-[10px] font-bold">Add</span>
+        <i className="fa-solid fa-plus text-[10px]"></i>
+      </button>
+    </div>
+    
+    {activities.map((act, idx) => (
+      <div key={idx} className="flex gap-2 items-center animate-in fade-in slide-in-from-top-1">
+        <div className="flex-[2]">
+          <input 
+            type="text" 
+            placeholder={placeholder} 
+            value={act.name} 
+            onChange={e => onChange(idx, 'name', e.target.value)} 
+            className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 transition-colors"
+          />
+        </div>
+        <div className="flex-1">
+          <select 
+            value={act.start} 
+            onChange={e => onChange(idx, 'start', e.target.value)}
+            className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
+          >
+            <option value="">Start</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <select 
+            value={act.end} 
+            onChange={e => onChange(idx, 'end', e.target.value)}
+            className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
+          >
+            <option value="">End</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const RoutineForm: React.FC<{
   onSubmit: (d: Record<string, string>) => void,
   isPreSchool: boolean
 }> = ({ onSubmit, isPreSchool }) => {
-  const [r, setR] = useState({
+  const [base, setBase] = useState({
     wakeUp: '',
-    schoolHours: '',
     lunchTime: '',
-    napRoutine: '',
-    tuitionTime: '',
-    eveningActivity: '',
     dinnerTime: '',
     bedTime: ''
   });
@@ -762,80 +815,97 @@ const RoutineForm: React.FC<{
   const [schoolStart, setSchoolStart] = useState('');
   const [schoolEnd, setSchoolEnd] = useState('');
 
-  useEffect(() => {
-    if (schoolStart && schoolEnd) {
-      setR(prev => ({ ...prev, schoolHours: `${schoolStart} to ${schoolEnd}` }));
-    }
-  }, [schoolStart, schoolEnd]);
+  // Dynamic States for multiple activities
+  const [afterSchool, setAfterSchool] = useState([{ name: '', start: '', end: '' }]);
+  const [tuition, setTuition] = useState([{ name: '', start: '', end: '' }]);
+  const [evening, setEvening] = useState([{ name: '', start: '', end: '' }]);
+
+  const handleAdd = (setter: any) => setter((prev: any) => [...prev, { name: '', start: '', end: '' }]);
+  
+  const handleChange = (setter: any, index: number, field: string, value: string) => {
+    setter((prev: any) => prev.map((item: any, i: number) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const formatActivities = (list: { name: string, start: string, end: string }[]) => {
+    return list
+      .filter(a => a.name.trim() !== '')
+      .map(a => `${a.name} (${a.start} - ${a.end})`)
+      .join(', ');
+  };
 
   const handleSubmit = () => {
     const submissionData = {
-      wakeUp: r.wakeUp,
-      schoolHours: r.schoolHours,
-      lunchTime: r.lunchTime,
-      napRoutine: isPreSchool ? r.napRoutine : '',
-      afterSchool: !isPreSchool ? r.napRoutine : '',
-      tuitionTime: r.tuitionTime,
-      eveningActivity: r.eveningActivity,
-      dinnerTime: r.dinnerTime,
-      bedTime: r.bedTime
+      wakeUp: base.wakeUp,
+      schoolHours: `${schoolStart} to ${schoolEnd}`,
+      lunchTime: base.lunchTime,
+      napRoutine: isPreSchool ? formatActivities(afterSchool) : '',
+      afterSchool: !isPreSchool ? formatActivities(afterSchool) : '',
+      tuitionTime: formatActivities(tuition),
+      eveningActivity: formatActivities(evening),
+      dinnerTime: base.dinnerTime,
+      bedTime: base.bedTime
     };
     onSubmit(submissionData);
   };
 
-  const isComplete = r.wakeUp && r.schoolHours && r.lunchTime && r.dinnerTime && r.bedTime;
+  const isComplete = base.wakeUp && schoolStart && schoolEnd && base.lunchTime && base.dinnerTime && base.bedTime;
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Wake Up Time" value={r.wakeUp} onChange={v => setR({...r, wakeUp: v})} />
-        <TimeSelect label="Bed Time" value={r.bedTime} onChange={v => setR({...r, bedTime: v})} />
+    <div className="mt-4 pb-4">
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <TimeSelect label="Wake Up Time" value={base.wakeUp} onChange={v => setBase({...base, wakeUp: v})} />
+        <TimeSelect label="Bed Time" value={base.bedTime} onChange={v => setBase({...base, bedTime: v})} />
       </div>
       
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">School Hours</label>
-        <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-                <select value={schoolStart} onChange={e => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none">
-                    <option value="">Start</option>
-                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]"></i>
-            </div>
-            <div className="relative">
-                <select value={schoolEnd} onChange={e => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none">
-                    <option value="">End</option>
-                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]"></i>
-            </div>
+      <div className="mb-4">
+        <label className="block text-[10px] font-extrabold text-slate-500 uppercase mb-2 px-1">School Hours</label>
+        <div className="grid grid-cols-2 gap-3">
+          <select value={schoolStart} onChange={e => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="">Start</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={schoolEnd} onChange={e => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="">End</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Lunch Time" value={r.lunchTime} onChange={v => setR({...r, lunchTime: v})} />
-        <TimeSelect label="Dinner Time" value={r.dinnerTime} onChange={v => setR({...r, dinnerTime: v})} />
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <TimeSelect label="Lunch Time" value={base.lunchTime} onChange={v => setBase({...base, lunchTime: v})} />
+        <TimeSelect label="Dinner Time" value={base.dinnerTime} onChange={v => setBase({...base, dinnerTime: v})} />
       </div>
 
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">{isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}</label>
-        <input type="text" placeholder={isPreSchool ? "e.g. Nap from 2-4 PM" : "e.g. Rest & Snacks"} value={r.napRoutine} onChange={e => setR({...r, napRoutine: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
-      </div>
+      <div className="space-y-2">
+        <DynamicActivityRow 
+          label={isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
+          activities={afterSchool}
+          onAdd={() => handleAdd(setAfterSchool)}
+          onChange={(idx, f, v) => handleChange(setAfterSchool, idx, f, v)}
+          placeholder="Activity name..."
+        />
 
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">Tuition / Coaching?</label>
-        <input type="text" placeholder="e.g. Math Tuition 5-6 PM (or None)" value={r.tuitionTime} onChange={e => setR({...r, tuitionTime: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
-      </div>
+        <DynamicActivityRow 
+          label="Tuition / Coaching?"
+          activities={tuition}
+          onAdd={() => handleAdd(setTuition)}
+          onChange={(idx, f, v) => handleChange(setTuition, idx, f, v)}
+          placeholder="Subject/Class..."
+        />
 
-      <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">Evening Activity</label>
-        <input type="text" placeholder="e.g. Playing, TV, Homework" value={r.eveningActivity} onChange={e => setR({...r, eveningActivity: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold" />
+        <DynamicActivityRow 
+          label="Evening Activity"
+          activities={evening}
+          onAdd={() => handleAdd(setEvening)}
+          onChange={(idx, f, v) => handleChange(setEvening, idx, f, v)}
+          placeholder="Play/Hobbies..."
+        />
       </div>
 
       <button 
         disabled={!isComplete}
         onClick={handleSubmit}
-        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2"
+        className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-100 uppercase tracking-widest"
       >
         Confirm Routine
       </button>
