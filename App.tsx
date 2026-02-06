@@ -3,7 +3,7 @@ import { ChatStep, UserBranch, ChatMessage, ChatState, AIPlanOutput, UserProfile
 import { generateSmartBuddyPlan } from './services/gemini';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
+import logo from './logo.png';
 // --- Constants ---
 
 const CLASSES = [
@@ -197,17 +197,14 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       setPasswordResetStage(false);
   };
 
-
-
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-white">
         <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xl">
-                <i className="fa-solid fa-robot-astronomer"></i>
+            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center overflow-hidden">
+                <img src="logo.png" alt="Student Shield" className="w-full h-full object-cover" />
             </div>
-            <h1 className="font-black text-2xl text-slate-800 tracking-tight">Smart Buddy</h1>
+            <h1 className="font-black text-2xl text-slate-800 tracking-tight">Student Shield</h1>
         </div>
         
         <h2 className="text-xl font-bold text-center mb-6 text-slate-700">
@@ -332,7 +329,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
 
     } else {
       // Routine does not exist: Ask for it
-      const greetingText = `Welcome, ${user.name}! I’m your Smart Buddy — your mentor & friend. To help me serve you best, please share your current daily routine. I will save this for your future visits.`;
+      const greetingText = `Welcome, ${user.name}! I’m your Student Shield — your mentor & friend. To help me serve you best, please share your current daily routine. I will save this for your future visits.`;
       addMessage({ sender: 'bot', text: greetingText, type: 'text' });
       addMessage({ sender: 'bot', text: "Please fill in your typical daily schedule below.", type: 'routine' });
       setState(prev => ({ ...prev, step: 'COLLECTING_ROUTINE' }));
@@ -383,6 +380,29 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       const qs = QUESTIONS[branch];
       const currentQuestion = qs[state.currentQuestionIndex];
       const answerKey = currentQuestion.key;
+
+      // --- VALIDATION: Check if difficult subjects are in the previously entered current subjects list ---
+      if (branch === 'SCHOOL_STUDY' && answerKey === 'difficultSubjects') {
+          const currentSubjectsRaw = state.answers['currentSubjects'] || '';
+          
+          // Helper to split and normalize strings (remove whitespace, lowercase, filter empty)
+          const normalizeList = (str: string) => str.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+          
+          const currentList = normalizeList(currentSubjectsRaw);
+          const difficultList = normalizeList(option);
+          
+          // Find subjects in difficult list that are NOT in current list
+          const invalidSubjects = difficultList.filter(d => !currentList.includes(d));
+          
+          if (invalidSubjects.length > 0) {
+              addMessage({ 
+                  sender: 'bot', 
+                  text: `Please verify your subjects. You listed "${invalidSubjects.join(', ')}" as difficult, but these weren't in your main subject list (${currentSubjectsRaw}). Please choose only from your current subjects.` 
+              });
+              return; // Halt progress until valid input is given
+          }
+      }
+      // --- END VALIDATION ---
       
       const nextIndex = state.currentQuestionIndex + 1;
       setState(prev => ({ 
@@ -478,7 +498,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
+      doc.text('STUDENT SHEILD BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
       
       doc.setFillColor(248, 250, 252);
       doc.rect(10, 68, pw - 20, 16, 'F');
@@ -581,7 +601,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('A Personal Message from your Smart Buddy:', 20, y + 10);
+      doc.text('A Personal Message from your Student Sheild: Smart Buddy:', 20, y + 10);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(80, 80, 80);
@@ -596,7 +616,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
           doc.setFontSize(7.5);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(180, 180, 180);
-          doc.text(`SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
+          doc.text(`Student Sheild: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
       }
       doc.save(`${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`);
     } catch (err) {
@@ -612,11 +632,11 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       <div className="w-full max-w-2xl bg-white h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white">
         
         <div className="bg-indigo-600 p-6 flex items-center gap-4 text-white shadow-lg relative z-10">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl">
-            <i className="fa-solid fa-robot-astronomer"></i>
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+            <img src={logo} alt="Student Shield" className="w-full h-full object-cover" />
           </div>
           <div>
-            <h1 className="font-black text-xl tracking-tight">Smart Buddy</h1>
+            <h1 className="font-black text-xl tracking-tight">Student Shield</h1>
             <p className="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Mentor & Friend</p>
           </div>
           <button onClick={onLogout} className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition">Logout</button>
@@ -714,7 +734,7 @@ const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string)
       <select 
         value={value} 
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
+        className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none cursor-pointer"
       >
         <option value="">Select Time</option>
         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -724,304 +744,168 @@ const TimeSelect: React.FC<{ label: string, value: string, onChange: (v: string)
   </div>
 );
 
-type NapRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
+// --- New Sub-Component for Dynamic Activities ---
 
-type TuitionRoutine = {
-  subject: string;
-  startTime: string;
-  endTime: string;
-};
-
-type EveningRoutine = {
-  activity: string;
-  startTime: string;
-  endTime: string;
-};
-
-type FormState = {
-  wakeUp: string;
-  schoolStart: string;
-  schoolEnd: string;
-  lunchTime: string;
-  dinnerTime: string;
-  bedTime: string;
-  napRoutines: NapRoutine[];
-  tuitionRoutines: TuitionRoutine[];
-  eveningRoutines: EveningRoutine[];
-};
-
+const DynamicActivityRow: React.FC<{
+  label: string,
+  activities: { name: string, start: string, end: string }[],
+  onAdd: () => void,
+  onChange: (index: number, field: string, value: string) => void,
+  placeholder: string
+}> = ({ label, activities, onAdd, onChange, placeholder }) => (
+  <div className="space-y-2 mb-4">
+    <div className="flex justify-between items-center px-1">
+      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{label}</label>
+      <button 
+        onClick={onAdd}
+        className="flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all group"
+      >
+        <span className="text-[10px] font-bold">Add</span>
+        <i className="fa-solid fa-plus text-[10px]"></i>
+      </button>
+    </div>
+    
+    {activities.map((act, idx) => (
+      <div key={idx} className="flex gap-2 items-center animate-in fade-in slide-in-from-top-1">
+        <div className="flex-[2]">
+          <input 
+            type="text" 
+            placeholder={placeholder} 
+            value={act.name} 
+            onChange={e => onChange(idx, 'name', e.target.value)} 
+            className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 transition-colors"
+          />
+        </div>
+        <div className="flex-1">
+          <select 
+            value={act.start} 
+            onChange={e => onChange(idx, 'start', e.target.value)}
+            className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
+          >
+            <option value="">Start</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <select 
+            value={act.end} 
+            onChange={e => onChange(idx, 'end', e.target.value)}
+            className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
+          >
+            <option value="">End</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const RoutineForm: React.FC<{
   onSubmit: (d: Record<string, string>) => void,
   isPreSchool: boolean
 }> = ({ onSubmit, isPreSchool }) => {
- const [form, setForm] = useState<FormState>({
-  wakeUp: '',
-  schoolStart: '',
-  schoolEnd: '',
-  lunchTime: '',
-  dinnerTime: '',
-  bedTime: '',
-  napRoutines: [{ activity: '', startTime: '', endTime: '' }],
-  tuitionRoutines: [{ subject: '', startTime: '', endTime: '' }],
-  eveningRoutines: [{ activity: '', startTime: '', endTime: '' }]
-});
-
-const updateArray = <T,>(
-  key: keyof FormState,
-  index: number,
-  field: keyof T,
-  value: string
-) => {
-  const copy = [...(form[key] as T[])];
-  copy[index][field] = value;
-  setForm({ ...form, [key]: copy });
-};
-
-const schoolHours =
-  form.schoolStart && form.schoolEnd
-    ? `${form.schoolStart} to ${form.schoolEnd}`
-    : "";
-
-
-const handleSubmit = () => {
-  onSubmit({
-    ...form,
-    schoolHours
+  const [base, setBase] = useState({
+    wakeUp: '',
+    lunchTime: '',
+    dinnerTime: '',
+    bedTime: ''
   });
-};
 
+  const [schoolStart, setSchoolStart] = useState('');
+  const [schoolEnd, setSchoolEnd] = useState('');
 
-  const isComplete = form.wakeUp && schoolHours && form.lunchTime && form.dinnerTime && form.bedTime;
+  // Dynamic States for multiple activities
+  const [afterSchool, setAfterSchool] = useState([{ name: '', start: '', end: '' }]);
+  const [tuition, setTuition] = useState([{ name: '', start: '', end: '' }]);
+  const [evening, setEvening] = useState([{ name: '', start: '', end: '' }]);
+
+  const handleAdd = (setter: any) => setter((prev: any) => [...prev, { name: '', start: '', end: '' }]);
+  
+  const handleChange = (setter: any, index: number, field: string, value: string) => {
+    setter((prev: any) => prev.map((item: any, i: number) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const formatActivities = (list: { name: string, start: string, end: string }[]) => {
+    return list
+      .filter(a => a.name.trim() !== '')
+      .map(a => `${a.name} (${a.start} - ${a.end})`)
+      .join(', ');
+  };
+
+  const handleSubmit = () => {
+    const submissionData = {
+      wakeUp: base.wakeUp,
+      schoolHours: `${schoolStart} to ${schoolEnd}`,
+      lunchTime: base.lunchTime,
+      napRoutine: isPreSchool ? formatActivities(afterSchool) : '',
+      afterSchool: !isPreSchool ? formatActivities(afterSchool) : '',
+      tuitionTime: formatActivities(tuition),
+      eveningActivity: formatActivities(evening),
+      dinnerTime: base.dinnerTime,
+      bedTime: base.bedTime
+    };
+    onSubmit(submissionData);
+  };
+
+  const isComplete = base.wakeUp && schoolStart && schoolEnd && base.lunchTime && base.dinnerTime && base.bedTime;
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Wake Up Time" value={form.wakeUp} onChange={v => setForm({...form, wakeUp: v})} />
-        <TimeSelect label="Bed Time" value={form.bedTime} onChange={v => setForm({...form, bedTime: v})} />
+    <div className="mt-4 pb-4">
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <TimeSelect label="Wake Up Time" value={base.wakeUp} onChange={v => setBase({...base, wakeUp: v})} />
+        <TimeSelect label="Bed Time" value={base.bedTime} onChange={v => setBase({...base, bedTime: v})} />
       </div>
       
-  <div className="space-y-1">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    School Hours
-  </label>
-
-  <div className="grid grid-cols-2 gap-2">
-    <div className="relative">
-      <select
-        value={form.schoolStart}
-        onChange={e =>
-          setForm({ ...form, schoolStart: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">Start</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-
-    <div className="relative">
-      <select
-        value={form.schoolEnd}
-        onChange={e =>
-          setForm({ ...form, schoolEnd: e.target.value })
-        }
-        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 text-slate-700 appearance-none"
-      >
-        <option value="">End</option>
-        {TIME_OPTIONS.map(t => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-      <i className="fa-solid fa-chevron-down absolute right-3 top-3.5 text-slate-300 pointer-events-none text-[10px]" />
-    </div>
-  </div>
-</div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <TimeSelect label="Lunch Time" value={form.lunchTime} onChange={v => setForm({...form, lunchTime: v})} />
-        <TimeSelect label="Dinner Time" value={form.dinnerTime} onChange={v => setForm({...form, dinnerTime: v})} />
+      <div className="mb-4">
+        <label className="block text-[10px] font-extrabold text-slate-500 uppercase mb-2 px-1">School Hours</label>
+        <div className="grid grid-cols-2 gap-3">
+          <select value={schoolStart} onChange={e => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="">Start</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={schoolEnd} onChange={e => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="">End</option>
+            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
       </div>
 
-      <div className="space-y-3">
-       <label className="text-[10px] font-bold text-slate-500 uppercase">
-    {isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
-  </label>
-  
-{form.napRoutines.map((r, i) => (
-  <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-  
-    <input
-      value={r.activity}
-      onChange={e =>
-        updateArray<NapRoutine>(
-          "napRoutines",
-          i,
-          "activity",
-          e.target.value
-        )
-      }
-      placeholder={isPreSchool ? "Nap" : "After school"}
-      className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-    />
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <TimeSelect label="Lunch Time" value={base.lunchTime} onChange={v => setBase({...base, lunchTime: v})} />
+        <TimeSelect label="Dinner Time" value={base.dinnerTime} onChange={v => setBase({...base, dinnerTime: v})} />
+      </div>
 
-    <TimeSelect
-      value={r.startTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "startTime", v)
-      }
-    />
+      <div className="space-y-2">
+        <DynamicActivityRow 
+          label={isPreSchool ? "Nap or Afternoon Rest?" : "After School Activity?"}
+          activities={afterSchool}
+          onAdd={() => handleAdd(setAfterSchool)}
+          onChange={(idx, f, v) => handleChange(setAfterSchool, idx, f, v)}
+          placeholder="Activity name..."
+        />
 
-    <TimeSelect
-      value={r.endTime}
-      onChange={v =>
-        updateArray<NapRoutine>("napRoutines", i, "endTime", v)
-      }
-    />
-  </div>
-))}
+        <DynamicActivityRow 
+          label="Tuition / Coaching?"
+          activities={tuition}
+          onAdd={() => handleAdd(setTuition)}
+          onChange={(idx, f, v) => handleChange(setTuition, idx, f, v)}
+          placeholder="Subject/Class..."
+        />
 
-<button
-  type="button"
-  onClick={() =>
-    setForm({
-      ...form,
-      napRoutines: [
-        ...form.napRoutines,
-        { activity: '', startTime: '', endTime: '' }
-      ]
-    })
-  }
-  className="text-xs font-bold text-blue-600"
->
-  + Add another
-</button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Tuition / Coaching?
-  </label>
-
-  {form.tuitionRoutines.map((r, i) => (
- 
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-
-      <input
-        value={r.subject}
-        onChange={e =>
-          updateArray<TuitionRoutine>(
-            "tuitionRoutines",
-            i,
-            "subject",
-            e.target.value
-          )
-        }
-        placeholder="Math tuition"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<TuitionRoutine>("tuitionRoutines", i, "endTime", v)
-        }
-      />
- 
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        tuitionRoutines: [
-          ...form.tuitionRoutines,
-          { subject: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-<div className="space-y-3">
-  <label className="text-[10px] font-bold text-slate-500 uppercase">
-    Evening Activity
-  </label>
-
-  {form.eveningRoutines.map((r, i) => (
-    <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr] gap-2">
-      <input
-        value={r.activity}
-        onChange={e =>
-          updateArray<EveningRoutine>(
-            "eveningRoutines",
-            i,
-            "activity",
-            e.target.value
-          )
-        }
-        placeholder="Playing"
-        className="w-full p-3 rounded-xl bg-slate-50 border text-xs font-bold"
-      />
-
-      <TimeSelect
-        value={r.startTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "startTime", v)
-        }
-      />
-
-      <TimeSelect
-        value={r.endTime}
-        onChange={v =>
-          updateArray<EveningRoutine>("eveningRoutines", i, "endTime", v)
-        }
-      />
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={() =>
-      setForm({
-        ...form,
-        eveningRoutines: [
-          ...form.eveningRoutines,
-          { activity: '', startTime: '', endTime: '' }
-        ]
-      })
-    }
-    className="text-xs font-bold text-indigo-600 hover:underline"
-  >
-    + Add another
-  </button>
-</div>
-
-
+        <DynamicActivityRow 
+          label="Evening Activity"
+          activities={evening}
+          onAdd={() => handleAdd(setEvening)}
+          onChange={(idx, f, v) => handleChange(setEvening, idx, f, v)}
+          placeholder="Play/Hobbies..."
+        />
+      </div>
 
       <button 
         disabled={!isComplete}
         onClick={handleSubmit}
-        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 mt-2"
+        className="w-full py-4 mt-6 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-100 uppercase tracking-widest"
       >
         Confirm Routine
       </button>

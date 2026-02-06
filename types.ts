@@ -1,4 +1,3 @@
-
 export type ChatStep = 
   | 'GREETING' 
   | 'PRE_SCHOOL_CHECK'
@@ -36,7 +35,7 @@ export interface ChatState {
     weight?: string;
     goal?: string;
   };
-  answers: Record<string, string>;
+  answers: Record<string, any>;
   currentQuestionIndex: number;
 }
 
@@ -58,5 +57,5 @@ export interface UserProfile {
   schoolId: string;
   phone: string;
   password?: string;
-  routine?: Record<string, string>;
+  routine?: Record<string, any>;
 }
