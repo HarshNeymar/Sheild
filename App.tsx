@@ -3,7 +3,7 @@ import { ChatStep, UserBranch, ChatMessage, ChatState, AIPlanOutput, UserProfile
 import { generateSmartBuddyPlan } from './services/gemini';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
+import logo from './logo.png';
 // --- Constants ---
 
 const CLASSES = [
@@ -633,7 +633,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
         
         <div className="bg-indigo-600 p-6 flex items-center gap-4 text-white shadow-lg relative z-10">
           <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
-            <img src="logo.png" alt="Student Shield" className="w-full h-full object-cover" />
+            <img src={logo} alt="Student Shield" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="font-black text-xl tracking-tight">Student Shield</h1>
