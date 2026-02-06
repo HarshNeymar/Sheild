@@ -204,7 +204,7 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
             <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xl">
                 <i className="fa-solid fa-robot-astronomer"></i>
             </div>
-            <h1 className="font-black text-2xl text-slate-800 tracking-tight">Smart Buddy</h1>
+            <h1 className="font-black text-2xl text-slate-800 tracking-tight">Student Sheild</h1>
         </div>
         
         <h2 className="text-xl font-bold text-center mb-6 text-slate-700">
