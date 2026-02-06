@@ -3,6 +3,7 @@ import { ChatStep, UserBranch, ChatMessage, ChatState, AIPlanOutput, UserProfile
 import { generateSmartBuddyPlan } from './services/gemini';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+// @ts-ignore
 import logo from './logo.png';
 // --- Constants ---
 
@@ -202,7 +203,8 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-white">
         <div className="flex items-center gap-3 mb-8 justify-center">
             <div className="w-[200px] h-[50px] rounded-full flex items-center justify-center overflow-hidden">
-                <img src="logo.png" alt="Student Shield" className="w-full h-full object-cover" />
+                {/* FIX: Changed from string path to imported variable */}
+                <img src={logo} alt="Student Shield" className="w-full h-full object-cover" />
             </div>
          
         </div>
