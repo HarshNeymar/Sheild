@@ -497,7 +497,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       
       const subTitleY = titleY + (titleLines.length * 11) + 1;
       
-      doc.setFontSize(9);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.text('STUDENT SHEILD BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
