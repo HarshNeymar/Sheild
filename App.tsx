@@ -201,10 +201,10 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-white">
         <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center overflow-hidden">
+            <div className="w-[200px] h-[50px] rounded-full flex items-center justify-center overflow-hidden">
                 <img src="logo.png" alt="Student Shield" className="w-full h-full object-cover" />
             </div>
-            <h1 className="font-black text-2xl text-slate-800 tracking-tight">Student Shield</h1>
+         
         </div>
         
         <h2 className="text-xl font-bold text-center mb-6 text-slate-700">
@@ -632,12 +632,15 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       <div className="w-full max-w-2xl bg-white h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white">
         
         <div className="bg-indigo-600 p-6 flex items-center gap-4 text-white shadow-lg relative z-10">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+          
+          <div>
+            <div className="w-[200px] h-12  rounded-full flex items-center justify-center overflow-hidden">
             <img src={logo} alt="Student Shield" className="w-full h-full object-cover" />
           </div>
-          <div>
-            <h1 className="font-black text-xl tracking-tight">Student Shield</h1>
-            <p className="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Mentor & Friend</p>
+            {/* <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+              <img src={logo} alt="Student Shield" className="w-full h-full object-cover" />
+              </div> */}
+            <p className="text-indigo-100 text-xs font-bold ml-8 opacity-80 uppercase tracking-widest">Mentor & Friend</p>
           </div>
           <button onClick={onLogout} className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition">Logout</button>
         </div>
