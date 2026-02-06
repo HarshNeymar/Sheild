@@ -636,7 +636,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
             <i className="fa-solid fa-robot-astronomer"></i>
           </div>
           <div>
-            <h1 className="font-black text-xl tracking-tight">Smart Buddy</h1>
+            <h1 className="font-black text-xl tracking-tight">Student Sheild</h1>
             <p className="text-indigo-100 text-xs font-bold opacity-80 uppercase tracking-widest">Mentor & Friend</p>
           </div>
           <button onClick={onLogout} className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition">Logout</button>
