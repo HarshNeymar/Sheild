@@ -16,7 +16,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Initialize Gemini
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
 if (!apiKey) {
   console.error("CRITICAL ERROR: API_KEY environment variable is missing!");
 }
