@@ -45,6 +45,35 @@ const generateTimeOptions = () => {
 
 const TIME_OPTIONS = generateTimeOptions();
 
+const getAutoLoginUserFromUrl = (): UserProfile | null => {
+  const params = new URLSearchParams(window.location.search);
+
+  const autoLogin = params.get("autoLogin");
+
+  if (autoLogin !== "true") {
+    return null;
+  }
+
+  const studentName = params.get("studentName") || "";
+  const schoolName = params.get("schoolName") || "";
+  const className = params.get("className") || "";
+  const age = params.get("age") || "";
+  const phone = params.get("phone") || params.get("studentId") || "auto-smart-buddy";
+
+  if (!studentName || !schoolName) {
+    return null;
+  }
+
+  return {
+    name: studentName,
+    age,
+    className,
+    schoolId: schoolName,
+    phone,
+    password: "",
+  };
+};
+
 const QUESTIONS: Record<UserBranch, { key: string, q: string, options: string[] }[]> = {
   'PRE_DAILY_ROUTINE': [
     { key: 'primaryGoal', q: 'Which area would you like to improve most?', options: ['Better Sleep Routine', 'Reduced Screen Time', 'Better Eating Habits', 'Calm Behaviour', 'More Focus'] },
@@ -284,7 +313,12 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
 
 // --- Main Chat Component ---
 
-const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUser: (u: UserProfile) => void }> = ({ user, onLogout, onUpdateUser }) => {
+const ChatScreen: React.FC<{
+  user: UserProfile;
+  onLogout: () => void;
+  onUpdateUser: (u: UserProfile) => void;
+  isAutoLogin?: boolean;
+}> = ({ user, onLogout, onUpdateUser, isAutoLogin = false }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [state, setState] = useState<ChatState>({
     step: 'GREETING',
@@ -500,7 +534,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('STUDENT SHEILD BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
+doc.text('STUDENT SHIELD SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
       
       doc.setFillColor(248, 250, 252);
       doc.rect(10, 68, pw - 20, 16, 'F');
@@ -511,8 +545,8 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
       doc.setFontSize(11);
       doc.setTextColor(60);
       doc.setFont('helvetica', 'bold');
-      const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}  |  AGE: ${cleanText(state.details.age)}YRS`;
-      doc.text(profile, pw / 2, 78, { align: 'center' });
+      const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  SCHOOL: ${cleanText(state.details.school).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}  |  AGE: ${cleanText(state.details.age) || "—"}YRS`;
+doc.text(profile, pw / 2, 78, { align: 'center' });
 
       doc.setFontSize(16);
       doc.setTextColor(30);
@@ -618,7 +652,7 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
           doc.setFontSize(7.5);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(180, 180, 180);
-          doc.text(`Student Sheild: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
+          doc.text(`Student Shield: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
       }
       doc.save(`${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`);
     } catch (err) {
@@ -644,7 +678,14 @@ const ChatScreen: React.FC<{ user: UserProfile, onLogout: () => void, onUpdateUs
               </div> */}
             <p className="text-indigo-100 text-xs font-bold ml-8 opacity-80 uppercase tracking-widest">Mentor & Friend</p>
           </div>
-          <button onClick={onLogout} className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition">Logout</button>
+          {!isAutoLogin && (
+  <button
+    onClick={onLogout}
+    className="ml-auto text-xs bg-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-800 transition"
+  >
+    Logout
+  </button>
+)}
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth bg-slate-50">
@@ -920,45 +961,71 @@ const RoutineForm: React.FC<{
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAutoLogin, setIsAutoLogin] = useState(false);
+
+  const setCurrentUser = (u: UserProfile | null, autoLogin = false) => {
+    setUser(u);
+    setIsAutoLogin(autoLogin);
+
+    if (u && !autoLogin) {
+      localStorage.setItem("smart_buddy_active_user", JSON.stringify(u));
+    } else {
+      localStorage.removeItem("smart_buddy_active_user");
+    }
+  };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('smart_buddy_active_user');
+    const autoLoginUser = getAutoLoginUserFromUrl();
+
+    if (autoLoginUser) {
+      setCurrentUser(autoLoginUser, true);
+      return;
+    }
+
+    const savedUser = localStorage.getItem("smart_buddy_active_user");
+
     if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        setCurrentUser(JSON.parse(savedUser), false);
       } catch (e) {
-        localStorage.removeItem('smart_buddy_active_user');
+        localStorage.removeItem("smart_buddy_active_user");
       }
     }
   }, []);
 
   const getUsers = () => {
-    const stored = localStorage.getItem('smart_buddy_users');
+    const stored = localStorage.getItem("smart_buddy_users");
     return stored ? JSON.parse(stored) : {};
   };
 
   const updateUser = (updatedUser: UserProfile) => {
+    if (isAutoLogin) {
+      setUser(updatedUser);
+      return;
+    }
+
     const users = getUsers();
     users[updatedUser.phone] = updatedUser;
-    localStorage.setItem('smart_buddy_users', JSON.stringify(users));
-    setCurrentUser(updatedUser);
-  };
-
-  const setCurrentUser = (u: UserProfile | null) => {
-      setUser(u);
-      if(u) localStorage.setItem('smart_buddy_active_user', JSON.stringify(u));
-      else localStorage.removeItem('smart_buddy_active_user');
+    localStorage.setItem("smart_buddy_users", JSON.stringify(users));
+    setCurrentUser(updatedUser, false);
   };
 
   return (
     <>
       {!user ? (
-        <AuthScreen onLogin={setCurrentUser} />
+        <AuthScreen onLogin={(u) => setCurrentUser(u, false)} />
       ) : (
-        <ChatScreen user={user} onLogout={() => setCurrentUser(null)} onUpdateUser={updateUser} />
+        <ChatScreen
+          user={user}
+          isAutoLogin={isAutoLogin}
+          onLogout={() => setCurrentUser(null, false)}
+          onUpdateUser={updateUser}
+        />
       )}
     </>
   );
 };
+
+export default App;
 
 export default App;
