@@ -23,43 +23,43 @@ if (!apiKey) {
 
 const ai = new GoogleGenAI({ apiKey: apiKey });
 
-app.post('/api/generate', async (req, res) => {
-  console.log("Received generation request");
-  try {
-    const { prompt, config } = req.body;
+// app.post('/api/generate', async (req, res) => {
+//   console.log("Received generation request");
+//   try {
+//     const { prompt, config } = req.body;
 
-    const modelId = "gemini-3-flash-preview"; 
+//     const modelId = "gemini-3-flash-preview"; 
 
-    console.log(`Calling Gemini Model: ${modelId}`);
+//     console.log(`Calling Gemini Model: ${modelId}`);
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: prompt,
-      config: config
-    });
+//     const response = await ai.models.generateContent({
+//       model: modelId,
+//       contents: prompt,
+//       config: config
+//     });
 
-    console.log("Gemini API response received successfully");
+//     console.log("Gemini API response received successfully");
 
-    if (!response.text) {
-        throw new Error("Empty response from AI model.");
-    }
+//     if (!response.text) {
+//         throw new Error("Empty response from AI model.");
+//     }
 
-    res.json({ text: response.text });
+//     res.json({ text: response.text });
 
-  } catch (error) {
-    console.error("Server API Error Full Trace:", error);
+//   } catch (error) {
+//     console.error("Server API Error Full Trace:", error);
     
-    const status = error.status || 500;
-    const message = error.message || 'Internal Server Error';
+//     const status = error.status || 500;
+//     const message = error.message || 'Internal Server Error';
     
-    // Handle Quota limits
-    if (status === 429 || message.includes('429')) {
-      return res.status(429).json({ error: "Server busy (Quota Exceeded). Please try again later." });
-    }
+//     // Handle Quota limits
+//     if (status === 429 || message.includes('429')) {
+//       return res.status(429).json({ error: "Server busy (Quota Exceeded). Please try again later." });
+//     }
 
-    res.status(status).json({ error: `AI Generation Failed: ${message}` });
-  }
-});
+//     res.status(status).json({ error: `AI Generation Failed: ${message}` });
+//   }
+// });
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
