@@ -569,8 +569,8 @@ const drawCenteredFittedText = (
       doc.setDrawColor(230, 230, 230);
       doc.setLineWidth(0.5);
       doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'D');
-const logoMaxW = 34;
-const logoMaxH = 14;
+const logoMaxW = 58;
+const logoMaxH = 26;
 
 const logoRatio = pdfLogo.width / pdfLogo.height;
 
