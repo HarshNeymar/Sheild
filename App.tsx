@@ -480,11 +480,65 @@ const ChatScreen: React.FC<{
     const cleaned = text.replace(/^\["|", "|^\[|\]$|"\]$|^"|"$/g, '').replace(/\*\*/g, '').trim();
     return cleaned === 'undefined' ? '' : cleaned;
   };
+const loadPdfLogo = (
+  src: string
+): Promise<{ dataUrl: string; width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
 
-  const downloadPDF = () => {
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        reject(new Error("Unable to load logo canvas"));
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+
+      resolve({
+        dataUrl: canvas.toDataURL("image/png"),
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
+    };
+
+    img.onerror = reject;
+    img.src = src;
+  });
+};
+
+const drawCenteredFittedText = (
+  doc: any,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  startFontSize: number,
+  minFontSize: number
+) => {
+  let fontSize = startFontSize;
+  doc.setFontSize(fontSize);
+
+  while (doc.getTextWidth(text) > maxWidth && fontSize > minFontSize) {
+    fontSize -= 0.25;
+    doc.setFontSize(fontSize);
+  }
+
+  doc.text(text, x, y, { align: "center" });
+};
+
+  const downloadPDF = async () => {
     if (!result) return;
     try {
       const doc = new jsPDF();
+      const pdfLogo = await loadPdfLogo(logo);
       const pw = doc.internal.pageSize.getWidth();
       const ph = doc.internal.pageSize.getHeight();
       let primaryRGB: [number, number, number] = [79, 70, 229];
@@ -515,7 +569,27 @@ const ChatScreen: React.FC<{
       doc.setDrawColor(230, 230, 230);
       doc.setLineWidth(0.5);
       doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'D');
+const logoMaxW = 34;
+const logoMaxH = 14;
 
+const logoRatio = pdfLogo.width / pdfLogo.height;
+
+let logoW = logoMaxW;
+let logoH = logoW / logoRatio;
+
+if (logoH > logoMaxH) {
+  logoH = logoMaxH;
+  logoW = logoH * logoRatio;
+}
+
+doc.addImage(
+  pdfLogo.dataUrl,
+  "PNG",
+  pw - logoW - 16,
+  15,
+  logoW,
+  logoH
+);
       doc.setFontSize(30);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 30, 30);
@@ -534,7 +608,15 @@ const ChatScreen: React.FC<{
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-doc.text('STUDENT SHIELD SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM', pw / 2, subTitleY, { align: 'center', charSpace: 1 });
+drawCenteredFittedText(
+  doc,
+  "STUDENT SHIELD SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM",
+  pw / 2,
+  46,
+  pw - 45,
+  7,
+  5.5
+);
       
       doc.setFillColor(248, 250, 252);
       doc.rect(10, 68, pw - 20, 16, 'F');
