@@ -473,7 +473,7 @@ const handleStart = () => {
   }));
 };
 
-  const handleChoice = (option: string) => {
+  const handleChoice = async (option: string) => {
     addMessage({ sender: 'user', text: option });
     
     if (state.step === 'MAIN_CHOICE') {
