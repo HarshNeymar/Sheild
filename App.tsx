@@ -6,7 +6,13 @@ import autoTable from 'jspdf-autotable';
 // @ts-ignore
 import logo from './logo.png';
 // --- Constants ---
-
+import {
+  exchangeSmartBuddyLaunchToken,
+  getSmartBuddyProfile,
+  logoutSmartBuddySession,
+  saveSmartBuddyProfile,
+  uploadSmartBuddyReport,
+} from './services/smartBuddyApi';
 const CLASSES = [
   'Playgroup', 'Nursery', 'LKG', 'UKG',
   'Std 1', 'Std 2', 'Std 3', 'Std 4', 'Std 5', 'Std 6',
@@ -45,32 +51,35 @@ const generateTimeOptions = () => {
 
 const TIME_OPTIONS = generateTimeOptions();
 
-const getAutoLoginUserFromUrl = (): UserProfile | null => {
-  const params = new URLSearchParams(window.location.search);
+const buildUserFromSmartBuddySession = (data: any): UserProfile => {
+  const student = data.student || {};
+  const school = data.school || {};
+  const savedProfile = data.saved_profile || {};
 
-  const autoLogin = params.get("autoLogin");
-
-  if (autoLogin !== "true") {
-    return null;
-  }
-
-  const studentName = params.get("studentName") || "";
-  const schoolName = params.get("schoolName") || "";
-  const className = params.get("className") || "";
-  const age = params.get("age") || "";
-  const phone = params.get("phone") || params.get("studentId") || "auto-smart-buddy";
-
-  if (!studentName || !schoolName) {
-    return null;
-  }
+  const formData = savedProfile.form_data || {};
+  const assessmentData = savedProfile.assessment_data || {};
 
   return {
-    name: studentName,
-    age,
-    className,
-    schoolId: schoolName,
-    phone,
-    password: "",
+    name: student.full_name || formData?.details?.name || 'Student',
+    age: String(student.age ?? formData?.details?.age ?? ''),
+    className:
+      student.class_assigned ||
+      formData?.details?.grade ||
+      formData?.details?.className ||
+      '',
+    schoolId:
+      school.name ||
+      formData?.details?.school ||
+      student.school_id ||
+      '',
+    phone: student.parent_phone || student.id || 'smart-buddy-student',
+    password: '',
+
+    studentId: student.id,
+    sessionToken: data.session_token || sessionStorage.getItem('smart_buddy_session_token') || '',
+    routine: formData.routine || {},
+    savedFormData: formData,
+    savedAssessmentData: assessmentData,
   };
 };
 
@@ -320,12 +329,20 @@ const ChatScreen: React.FC<{
   isAutoLogin?: boolean;
 }> = ({ user, onLogout, onUpdateUser, isAutoLogin = false }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [state, setState] = useState<ChatState>({
-    step: 'GREETING',
-    details: { name: user.name, age: user.age, grade: user.className, school: user.schoolId },
-    answers: {},
-    currentQuestionIndex: 0
-  });
+ const savedFormData = user.savedFormData || {};
+
+const [state, setState] = useState<ChatState>({
+  step: 'GREETING',
+  details: savedFormData.details || {
+    name: user.name,
+    age: user.age,
+    grade: user.className,
+    school: user.schoolId,
+  },
+  answers: savedFormData.answers || {},
+  branch: savedFormData.branch,
+  currentQuestionIndex: savedFormData.currentQuestionIndex || 0,
+});
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIPlanOutput | null>(null);
@@ -339,6 +356,36 @@ const ChatScreen: React.FC<{
     setMessages(prev => [...prev, { ...msg, id: Math.random().toString(36).substr(2, 9) }]);
   };
 
+  const persistSmartBuddyProfile = async (
+  nextFormData: Record<string, any>,
+  nextAssessmentData?: Record<string, any>
+) => {
+  if (!user.sessionToken) return;
+
+  try {
+    await saveSmartBuddyProfile(
+      {
+        form_data: {
+          ...(user.savedFormData || {}),
+          ...nextFormData,
+          updated_at: new Date().toISOString(),
+        },
+        ...(nextAssessmentData
+          ? {
+              assessment_data: {
+                ...(user.savedAssessmentData || {}),
+                ...nextAssessmentData,
+                updated_at: new Date().toISOString(),
+              },
+            }
+          : {}),
+      },
+      user.sessionToken
+    );
+  } catch (error) {
+    console.error('Smart Buddy profile save failed:', error);
+  }
+};
   const showMainOptions = () => {
     const isPreSchool = PRE_SCHOOL_CLASSES.includes(user.className);
     if (isPreSchool) {
@@ -348,43 +395,83 @@ const ChatScreen: React.FC<{
     }
   };
 
-  const handleStart = () => {
-    // CHECK IF ROUTINE EXISTS IN USER PROFILE
-    if (user.routine && Object.keys(user.routine).length > 0) {
-      // Routine exists: Jump to Main Choice
-      const greetingText = `Welcome back, ${user.name}! I remember your daily routine. How can I help you improve today?`;
-      addMessage({ sender: 'bot', text: greetingText, type: 'text' });
-      
-      showMainOptions();
-      
-      setState(prev => ({ 
-        ...prev, 
-        step: 'MAIN_CHOICE',
-        answers: { ...prev.answers, ...user.routine } // Load saved routine into answers
-      }));
+const handleStart = () => {
+  const savedAnswers = user.savedFormData?.answers || {};
+  const savedRoutine = user.routine || user.savedFormData?.routine || {};
 
-    } else {
-      // Routine does not exist: Ask for it
-      const greetingText = `Welcome, ${user.name}! I’m your Student Shield — your mentor & friend. To help me serve you best, please share your current daily routine. I will save this for your future visits.`;
-      addMessage({ sender: 'bot', text: greetingText, type: 'text' });
-      addMessage({ sender: 'bot', text: "Please fill in your typical daily schedule below.", type: 'routine' });
-      setState(prev => ({ ...prev, step: 'COLLECTING_ROUTINE' }));
-    }
-  };
+  if (savedRoutine && Object.keys(savedRoutine).length > 0) {
+    const greetingText = `Welcome back, ${user.name}! I remember your saved routine. You can continue or update your Smart Buddy plan anytime.`;
 
-  const handleRoutineSubmit = (routineData: Record<string, string>) => {
-    // Save routine to Chat State
-    const updatedAnswers = { ...state.answers, ...routineData };
-    
-    // SAVE ROUTINE TO BACKEND (LocalStorage) via User Profile
-    const updatedUser: UserProfile = { ...user, routine: routineData };
-    onUpdateUser(updatedUser);
+    addMessage({
+      sender: 'bot',
+      text: greetingText,
+      type: 'text',
+    });
 
-    addMessage({ sender: 'bot', text: "Thanks! I've saved your routine." });
-    
     showMainOptions();
-    setState(prev => ({ ...prev, answers: updatedAnswers, step: 'MAIN_CHOICE' }));
+
+    setState((prev) => ({
+      ...prev,
+      step: 'MAIN_CHOICE',
+      answers: {
+        ...prev.answers,
+        ...savedAnswers,
+        ...savedRoutine,
+      },
+    }));
+  } else {
+    const greetingText = `Welcome, ${user.name}! I’m your Student Shield — your mentor & friend. To help me serve you best, please share your current daily routine. I will save this for your future visits.`;
+
+    addMessage({
+      sender: 'bot',
+      text: greetingText,
+      type: 'text',
+    });
+
+    addMessage({
+      sender: 'bot',
+      text: 'Please fill in your typical daily schedule below.',
+      type: 'routine',
+    });
+
+    setState((prev) => ({
+      ...prev,
+      step: 'COLLECTING_ROUTINE',
+    }));
+  }
+};
+ const handleRoutineSubmit = async (routineData: Record<string, string>) => {
+  const updatedAnswers = { ...state.answers, ...routineData };
+
+  const updatedUser: UserProfile = {
+    ...user,
+    routine: routineData,
+    savedFormData: {
+      ...(user.savedFormData || {}),
+      routine: routineData,
+      answers: updatedAnswers,
+      details: state.details,
+    },
   };
+
+  onUpdateUser(updatedUser);
+
+  await persistSmartBuddyProfile({
+    routine: routineData,
+    answers: updatedAnswers,
+    details: state.details,
+  });
+
+  addMessage({ sender: 'bot', text: "Thanks! I've saved your routine." });
+
+  showMainOptions();
+
+  setState((prev) => ({
+    ...prev,
+    answers: updatedAnswers,
+    step: 'MAIN_CHOICE',
+  }));
+};
 
   const handleChoice = (option: string) => {
     addMessage({ sender: 'user', text: option });
@@ -440,39 +527,92 @@ const ChatScreen: React.FC<{
       }
       // --- END VALIDATION ---
       
-      const nextIndex = state.currentQuestionIndex + 1;
-      setState(prev => ({ 
-        ...prev, 
-        answers: { ...prev.answers, [answerKey]: option },
-        currentQuestionIndex: nextIndex 
-      }));
+    const nextIndex = state.currentQuestionIndex + 1;
 
-      if (nextIndex < qs.length) {
-        const nextQ = qs[nextIndex];
-        addMessage({ sender: 'bot', text: nextQ.q, options: nextQ.options, type: nextQ.options.length ? 'choice' : 'text' });
-      } else {
-        processResults();
+const nextAnswers = {
+  ...state.answers,
+  [answerKey]: option,
+};
+
+const nextState: ChatState = {
+  ...state,
+  answers: nextAnswers,
+  currentQuestionIndex: nextIndex,
+};
+
+setState(nextState);
+
+await persistSmartBuddyProfile({
+  routine: user.routine || nextAnswers,
+  branch,
+  answers: nextAnswers,
+  details: nextState.details,
+  currentQuestionIndex: nextIndex,
+});
+
+if (nextIndex < qs.length) {
+  const nextQ = qs[nextIndex];
+
+  addMessage({
+    sender: 'bot',
+    text: nextQ.q,
+    options: nextQ.options,
+    type: nextQ.options.length ? 'choice' : 'text',
+  });
+} else {
+  processResults(nextState);
+}
+    }
+  };
+
+const processResults = async (stateToGenerate: ChatState = state) => {
+  setState((prev) => ({ ...prev, step: 'GENERATING' }));
+  setLoading(true);
+
+  addMessage({
+    sender: 'bot',
+    text: `Thank you, ${stateToGenerate.details.name}! I am now analyzing your details to build your specialized plan based on Ultra-Core requirements...`,
+  });
+
+  try {
+    const plan = await generateSmartBuddyPlan(stateToGenerate);
+
+    setResult(plan);
+
+    setState((prev) => ({
+      ...prev,
+      step: 'COMPLETED',
+    }));
+
+    await persistSmartBuddyProfile(
+      {
+        routine: user.routine || stateToGenerate.answers,
+        branch: stateToGenerate.branch,
+        answers: stateToGenerate.answers,
+        details: stateToGenerate.details,
+        currentQuestionIndex: stateToGenerate.currentQuestionIndex,
+      },
+      {
+        latest_plan: plan,
+        latest_branch: stateToGenerate.branch,
+        generated_at: new Date().toISOString(),
       }
-    }
-  };
+    );
 
-  const processResults = async () => {
-    setState(prev => ({ ...prev, step: 'GENERATING' }));
-    setLoading(true);
-    addMessage({ sender: 'bot', text: `Thank you, ${state.details.name}! I am now analyzing your details to build your specialized plan based on Ultra-Core requirements...` });
-    
-    try {
-      const plan = await generateSmartBuddyPlan(state);
-      setResult(plan);
-      setState(prev => ({ ...prev, step: 'COMPLETED' }));
-      addMessage({ sender: 'bot', text: 'I have finished your personalized plan! You can download your specialized report below.', type: 'download' });
-    } catch (err: any) {
-      // Display message from service
-      addMessage({ sender: 'bot', text: err.message || 'I encountered a small glitch. Please try restarting!' });
-    } finally {
-      setLoading(false);
-    }
-  };
+    addMessage({
+      sender: 'bot',
+      text: 'I have finished your personalized plan! You can download your specialized report below.',
+      type: 'download',
+    });
+  } catch (err: any) {
+    addMessage({
+      sender: 'bot',
+      text: err.message || 'I encountered a small glitch. Please try restarting!',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const cleanText = (text: any): string => {
     if (text === null || text === undefined) return '';
@@ -736,7 +876,43 @@ doc.text(profile, pw / 2, 78, { align: 'center' });
           doc.setTextColor(180, 180, 180);
           doc.text(`Student Shield: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
       }
-      doc.save(`${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`);
+      const fileName = `${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`;
+
+const pdfBlob = doc.output('blob');
+
+doc.save(fileName);
+
+if (user.sessionToken) {
+  try {
+    const formData = new FormData();
+
+    formData.append('file', pdfBlob, fileName);
+    formData.append(
+      'report_title',
+      result.title || 'Smart Buddy Report'
+    );
+    formData.append(
+      'report_data',
+      JSON.stringify({
+        details: state.details,
+        branch: state.branch,
+        answers: state.answers,
+        routine: user.routine || {},
+        plan: result,
+        generated_at: new Date().toISOString(),
+      })
+    );
+
+    await uploadSmartBuddyReport(formData, user.sessionToken);
+
+    alert('PDF downloaded and saved to your Student Shield portal.');
+  } catch (uploadError) {
+    console.error('PDF archive upload failed:', uploadError);
+    alert(
+      'PDF downloaded, but could not be saved to Student Shield portal. Please try again.'
+    );
+  }
+}
     } catch (err) {
       console.error("PDF Generation Error:", err);
       alert("Something went wrong while generating the PDF. Please try again or check the console.");
@@ -785,7 +961,7 @@ doc.text(profile, pw / 2, 78, { align: 'center' });
                     {m.options.map(opt => (
                       <button 
                         key={opt}
-                        onClick={() => handleChoice(opt)}
+                        onClick={() => void handleChoice(opt)}
                         className="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-600 hover:text-white transition-all font-bold"
                       >
                         {opt}
@@ -839,11 +1015,23 @@ doc.text(profile, pw / 2, 78, { align: 'center' });
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Type your answer..."
-              onKeyDown={(e) => e.key === 'Enter' && userInput && (handleChoice(userInput), setUserInput(''))}
+              onKeyDown={async (e) => {
+  if (e.key === 'Enter' && userInput) {
+    const value = userInput;
+    setUserInput('');
+    await handleChoice(value);
+  }
+}}
               className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-indigo-400 font-bold"
             />
             <button 
-              onClick={() => userInput && (handleChoice(userInput), setUserInput(''))}
+              onClick={async () => {
+  if (userInput) {
+    const value = userInput;
+    setUserInput('');
+    await handleChoice(value);
+  }
+}}
               className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition"
             >
               <i className="fa-solid fa-paper-plane"></i>
@@ -1044,39 +1232,82 @@ const RoutineForm: React.FC<{
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAutoLogin, setIsAutoLogin] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [bootError, setBootError] = useState('');
 
   const setCurrentUser = (u: UserProfile | null, autoLogin = false) => {
     setUser(u);
     setIsAutoLogin(autoLogin);
 
     if (u && !autoLogin) {
-      localStorage.setItem("smart_buddy_active_user", JSON.stringify(u));
+      localStorage.setItem('smart_buddy_active_user', JSON.stringify(u));
     } else {
-      localStorage.removeItem("smart_buddy_active_user");
+      localStorage.removeItem('smart_buddy_active_user');
     }
   };
 
   useEffect(() => {
-    const autoLoginUser = getAutoLoginUserFromUrl();
-
-    if (autoLoginUser) {
-      setCurrentUser(autoLoginUser, true);
-      return;
-    }
-
-    const savedUser = localStorage.getItem("smart_buddy_active_user");
-
-    if (savedUser) {
+    const bootstrap = async () => {
       try {
-        setCurrentUser(JSON.parse(savedUser), false);
-      } catch (e) {
-        localStorage.removeItem("smart_buddy_active_user");
+        const params = new URLSearchParams(window.location.search);
+        const launchToken = params.get('launch_token');
+
+        if (launchToken) {
+          const session = await exchangeSmartBuddyLaunchToken(launchToken);
+          const nextUser = buildUserFromSmartBuddySession(session);
+
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+
+          setCurrentUser(nextUser, true);
+          return;
+        }
+
+        const existingSessionToken = sessionStorage.getItem(
+          'smart_buddy_session_token'
+        );
+
+        if (existingSessionToken) {
+          const profile = await getSmartBuddyProfile(existingSessionToken);
+
+          const nextUser = buildUserFromSmartBuddySession({
+            ...profile,
+            session_token: existingSessionToken,
+          });
+
+          setCurrentUser(nextUser, true);
+          return;
+        }
+
+        const savedUser = localStorage.getItem('smart_buddy_active_user');
+
+        if (savedUser) {
+          try {
+            setCurrentUser(JSON.parse(savedUser), false);
+          } catch {
+            localStorage.removeItem('smart_buddy_active_user');
+          }
+        }
+      } catch (error: any) {
+        console.error('Smart Buddy bootstrap failed:', error);
+        sessionStorage.removeItem('smart_buddy_session_token');
+        setBootError(
+          error?.message ||
+            'Smart Buddy session expired. Please open it again from Student Shield.'
+        );
+      } finally {
+        setBooting(false);
       }
-    }
+    };
+
+    bootstrap();
   }, []);
 
   const getUsers = () => {
-    const stored = localStorage.getItem("smart_buddy_users");
+    const stored = localStorage.getItem('smart_buddy_users');
     return stored ? JSON.parse(stored) : {};
   };
 
@@ -1088,9 +1319,54 @@ const App: React.FC = () => {
 
     const users = getUsers();
     users[updatedUser.phone] = updatedUser;
-    localStorage.setItem("smart_buddy_users", JSON.stringify(users));
+    localStorage.setItem('smart_buddy_users', JSON.stringify(users));
     setCurrentUser(updatedUser, false);
   };
+
+  const handleLogout = async () => {
+    if (user?.sessionToken) {
+      await logoutSmartBuddySession(user.sessionToken);
+    }
+
+    setCurrentUser(null, false);
+  };
+
+  if (booting) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="font-bold text-slate-700">Opening Smart Buddy...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (bootError && !user) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md text-center">
+          <h1 className="text-xl font-black text-slate-800 mb-2">
+            Session Error
+          </h1>
+
+          <p className="text-sm text-slate-500 mb-6">{bootError}</p>
+
+          <button
+            onClick={() => {
+              setBootError('');
+              window.location.href =
+                import.meta.env.VITE_STUDENT_SHIELD_APP_URL ||
+                'https://student-shield-frontend.vercel.app/student/smart-buddy';
+            }}
+            className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold"
+          >
+            Back to Student Shield
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1100,7 +1376,7 @@ const App: React.FC = () => {
         <ChatScreen
           user={user}
           isAutoLogin={isAutoLogin}
-          onLogout={() => setCurrentUser(null, false)}
+          onLogout={handleLogout}
           onUpdateUser={updateUser}
         />
       )}

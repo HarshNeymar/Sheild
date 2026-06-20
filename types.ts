@@ -58,4 +58,9 @@ export interface UserProfile {
   phone: string;
   password?: string;
   routine?: Record<string, any>;
+
+  studentId?: string;
+  sessionToken?: string;
+  savedFormData?: Record<string, any>;
+  savedAssessmentData?: Record<string, any>;
 }
