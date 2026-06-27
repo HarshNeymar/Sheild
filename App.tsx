@@ -51,34 +51,74 @@ const generateTimeOptions = () => {
 
 const TIME_OPTIONS = generateTimeOptions();
 
-const buildUserFromSmartBuddySession = (data: any): UserProfile => {
-  const student = data.student || {};
-  const school = data.school || {};
-  const savedProfile = data.saved_profile || {};
+const firstNonEmpty = (...values: unknown[]) => {
+  for (const value of values) {
+    if (value === 0) return "0";
 
-  const formData = savedProfile.form_data || {};
-  const assessmentData = savedProfile.assessment_data || {};
+    if (value !== null && value !== undefined) {
+      const normalized = String(value).trim();
+
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return "";
+};
+
+const buildUserFromSmartBuddySession = (data: any): UserProfile => {
+  const profile = data?.profile ?? data ?? {};
+
+  const student = profile.student ?? {};
+  const school = profile.school ?? {};
+  const savedProfile = profile.saved_profile ?? {};
+
+  const formData = savedProfile.form_data ?? {};
+  const assessmentData = savedProfile.assessment_data ?? {};
+  const savedDetails = formData.details ?? {};
+
+  // Main Student Shield profile is always the source of truth.
+  const canonicalDetails = {
+    name: firstNonEmpty(student.full_name, savedDetails.name, "Student"),
+    age: firstNonEmpty(student.age, savedDetails.age),
+    grade: firstNonEmpty(
+      student.class_assigned,
+      savedDetails.grade,
+      savedDetails.className
+    ),
+    school: firstNonEmpty(
+      school.name,
+      savedDetails.school,
+      student.school_id
+    ),
+  };
 
   return {
-    name: student.full_name || formData?.details?.name || 'Student',
-    age: String(student.age ?? formData?.details?.age ?? ''),
-    className:
-      student.class_assigned ||
-      formData?.details?.grade ||
-      formData?.details?.className ||
-      '',
-    schoolId:
-      school.name ||
-      formData?.details?.school ||
-      student.school_id ||
-      '',
-    phone: student.parent_phone || student.id || 'smart-buddy-student',
-    password: '',
+    name: canonicalDetails.name,
+    age: canonicalDetails.age,
+    className: canonicalDetails.grade,
+    schoolId: canonicalDetails.school,
 
+    phone: firstNonEmpty(
+      student.parent_phone,
+      student.id,
+      "smart-buddy-student"
+    ),
+
+    password: "",
     studentId: student.id,
-    sessionToken: data.session_token || sessionStorage.getItem('smart_buddy_session_token') || '',
-    routine: formData.routine || {},
+
+    sessionToken:
+      data?.session_token ||
+      sessionStorage.getItem("smart_buddy_session_token") ||
+      "",
+
+    routine: formData.routine ?? {},
+
+    // Keep raw old data so we can detect and repair blank/wrong values.
     savedFormData: formData,
+
     savedAssessmentData: assessmentData,
   };
 };
@@ -330,24 +370,51 @@ const ChatScreen: React.FC<{
 }> = ({ user, onLogout, onUpdateUser, isAutoLogin = false }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
  const savedFormData = user.savedFormData || {};
+const savedDetails = savedFormData.details || {};
+
+// Student Shield portal details override old Smart Buddy saved details.
+const studentDetails = {
+  name: firstNonEmpty(user.name, savedDetails.name, "Student"),
+  age: firstNonEmpty(user.age, savedDetails.age),
+  grade: firstNonEmpty(
+    user.className,
+    savedDetails.grade,
+    savedDetails.className
+  ),
+  school: firstNonEmpty(user.schoolId, savedDetails.school),
+};
 
 const [state, setState] = useState<ChatState>({
-  step: 'GREETING',
-  details: savedFormData.details || {
-    name: user.name,
-    age: user.age,
-    grade: user.className,
-    school: user.schoolId,
-  },
+  step: "GREETING",
+  details: studentDetails,
   answers: savedFormData.answers || {},
   branch: savedFormData.branch,
   currentQuestionIndex: savedFormData.currentQuestionIndex || 0,
 });
-  const [userInput, setUserInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AIPlanOutput | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
+const [userInput, setUserInput] = useState("");
+const [loading, setLoading] = useState(false);
+
+const [result, setResult] = useState<AIPlanOutput | null>(
+  user.savedAssessmentData?.latest_plan || null
+);
+  const scrollRef = useRef<HTMLDivElement>(null);
+useEffect(() => {
+  const existingDetails = savedFormData.details || {};
+
+  const detailsNeedRepair =
+    existingDetails.name !== studentDetails.name ||
+    String(existingDetails.age ?? "") !== studentDetails.age ||
+    existingDetails.grade !== studentDetails.grade ||
+    existingDetails.school !== studentDetails.school;
+
+  if (detailsNeedRepair) {
+    void persistSmartBuddyProfile({
+      ...savedFormData,
+      details: studentDetails,
+    });
+  }
+}, []);
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -674,250 +741,385 @@ const drawCenteredFittedText = (
   doc.text(text, x, y, { align: "center" });
 };
 
-  const downloadPDF = async () => {
-    if (!result) return;
-    try {
-      const doc = new jsPDF();
-      const pdfLogo = await loadPdfLogo(logo);
-      const pw = doc.internal.pageSize.getWidth();
-      const ph = doc.internal.pageSize.getHeight();
-      let primaryRGB: [number, number, number] = [79, 70, 229];
-      let lightRGB: [number, number, number] = [240, 244, 255]; 
-      let planTitle = "SUCCESS ROADMAP";
-      
-      if (state.branch?.includes('DIET') || state.branch?.includes('NUTRITION')) {
-          primaryRGB = [225, 29, 72];
-          lightRGB = [255, 241, 242];
-          planTitle = "PERSONALIZED DIET & NUTRITION PLAN";
-      } else if (state.branch?.includes('WELLNESS')) {
-          primaryRGB = [16, 185, 129];
-          lightRGB = [236, 253, 245];
-          planTitle = "STUDENT WELLNESS & MINDSET PLAN";
-      } else if (state.branch?.includes('DAILY_ROUTINE')) {
-          primaryRGB = [37, 99, 235];
-          lightRGB = [239, 246, 255];
-          planTitle = "PRE-SCHOOL DAILY ROUTINE";
-      } else if (state.branch?.includes('STUDY')) {
-          planTitle = "PERSONALIZED STUDY ROADMAP";
+const getPdfStudentDetails = () => ({
+  name: firstNonEmpty(user.name, state.details?.name, "Student"),
+  age: firstNonEmpty(user.age, state.details?.age, "—"),
+  grade: firstNonEmpty(
+    user.className,
+    state.details?.grade,
+    "—"
+  ),
+  school: firstNonEmpty(user.schoolId, state.details?.school, "—"),
+});
+
+const downloadPDF = async () => {
+  if (!result) return;
+
+  const pdfStudent = getPdfStudentDetails();
+
+  try {
+    const doc = new jsPDF();
+    const pdfLogo = await loadPdfLogo(logo);
+
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+
+    let primaryRGB: [number, number, number] = [79, 70, 229];
+    let lightRGB: [number, number, number] = [240, 244, 255];
+    let planTitle = "SUCCESS ROADMAP";
+
+    if (state.branch?.includes("DIET") || state.branch?.includes("NUTRITION")) {
+      primaryRGB = [225, 29, 72];
+      lightRGB = [255, 241, 242];
+      planTitle = "PERSONALIZED DIET & NUTRITION PLAN";
+    } else if (state.branch?.includes("WELLNESS")) {
+      primaryRGB = [16, 185, 129];
+      lightRGB = [236, 253, 245];
+      planTitle = "STUDENT WELLNESS & MINDSET PLAN";
+    } else if (state.branch?.includes("DAILY_ROUTINE")) {
+      primaryRGB = [37, 99, 235];
+      lightRGB = [239, 246, 255];
+      planTitle = "PRE-SCHOOL DAILY ROUTINE";
+    } else if (state.branch?.includes("STUDY")) {
+      planTitle = "PERSONALIZED STUDY ROADMAP";
+    }
+
+    doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+    doc.rect(0, 0, pw, 28, "F");
+
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(10, 10, pw - 20, 50, 4, 4, "F");
+
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(10, 10, pw - 20, 50, 4, 4, "D");
+
+    const logoMaxW = 75;
+    const logoMaxH = 34;
+    const logoRatio = pdfLogo.width / pdfLogo.height;
+
+    let logoW = logoMaxW;
+    let logoH = logoW / logoRatio;
+
+    if (logoH > logoMaxH) {
+      logoH = logoMaxH;
+      logoW = logoH * logoRatio;
+    }
+
+    doc.addImage(
+      pdfLogo.dataUrl,
+      "PNG",
+      pw - logoW - 16,
+      15,
+      logoW,
+      logoH
+    );
+
+    doc.setFontSize(30);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 30);
+
+    // Uses actual school data from Student Shield backend.
+    const schoolName =
+      cleanText(pdfStudent.school).toUpperCase() || "YOUR SCHOOL";
+
+    // Keep title away from the logo at top-right.
+    const titleLines = doc.splitTextToSize(schoolName, pw - 95);
+
+    let titleY = 32;
+
+    if (titleLines.length > 1) titleY = 28;
+    if (titleLines.length > 2) titleY = 24;
+
+    doc.text(titleLines, pw / 2, titleY, { align: "center" });
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+
+    drawCenteredFittedText(
+      doc,
+      "STUDENT SHIELD SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM",
+      pw / 2,
+      46,
+      pw - 45,
+      7,
+      5.5
+    );
+
+    doc.setFillColor(248, 250, 252);
+    doc.rect(10, 68, pw - 20, 16, "F");
+
+    doc.setDrawColor(220);
+    doc.line(10, 68, pw - 10, 68);
+    doc.line(10, 84, pw - 10, 84);
+
+    doc.setFontSize(11);
+    doc.setTextColor(60);
+    doc.setFont("helvetica", "bold");
+
+    // Uses actual student data from Student Shield backend.
+    const profile =
+      `STUDENT: ${cleanText(pdfStudent.name).toUpperCase()}  |  ` +
+      `SCHOOL: ${cleanText(pdfStudent.school).toUpperCase()}  |  ` +
+      `CLASS: ${cleanText(pdfStudent.grade)}  |  ` +
+      `AGE: ${cleanText(pdfStudent.age) || "—"} YRS`;
+
+    doc.text(profile, pw / 2, 78, { align: "center" });
+
+    doc.setFontSize(16);
+    doc.setTextColor(30);
+    doc.setFont("helvetica", "bold");
+    doc.text(planTitle, pw / 2, 95, { align: "center" });
+
+    let y = 110;
+
+    result.sections.forEach((sec, idx) => {
+      if (y > ph - 45) {
+        doc.addPage();
+        y = 30;
+
+        doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+        doc.rect(0, 0, 8, ph, "F");
       }
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+
+      const cleanHeading = cleanText(sec.heading).replace(
+        /^\d+[\.\)\s]+\s*/,
+        ""
+      );
+
+      const headerText = `${idx + 1}. ${cleanHeading.toUpperCase()}`;
+
+      doc.text(headerText, 18, y);
+
+      const textWidth = doc.getTextWidth(headerText);
+
+      y += 2.5;
+
+      doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+      doc.setLineWidth(1.2);
+      doc.line(18, y, 18 + textWidth, y);
+      doc.setLineWidth(0.2);
+
+      y += 12;
+
+      doc.setFontSize(10.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(70, 70, 70);
+
+      const isTable =
+        Array.isArray(sec.content) &&
+        sec.content.length > 0 &&
+        typeof sec.content[0] === "object";
+
+      const isList =
+        Array.isArray(sec.content) &&
+        (sec.content.length === 0 || typeof sec.content[0] === "string");
+
+      if (isTable) {
+        const tableData = (sec.content as any[]).filter(
+          (row) => row && typeof row === "object"
+        );
+
+        if (tableData.length > 0) {
+          const headKeys = Object.keys(tableData[0]);
+
+          const headLabels = headKeys.map((key) =>
+            key.replace(/([A-Z])/g, " $1").toUpperCase()
+          );
+
+          const body = tableData.map((row: any) =>
+            headKeys.map((key) => cleanText(row[key]))
+          );
+
+          autoTable(doc, {
+            startY: y,
+            head: [headLabels],
+            body,
+            margin: { left: 18, right: 18 },
+            theme: "striped",
+            headStyles: {
+              fillColor: primaryRGB,
+              textColor: 255,
+              fontStyle: "bold",
+              fontSize: 9,
+              halign: "center",
+              cellPadding: 4,
+            },
+            styles: {
+              fontSize: 8.5,
+              cellPadding: 4,
+              valign: "middle",
+              textColor: 50,
+              lineColor: [240, 240, 240],
+              lineWidth: 0.1,
+            },
+            alternateRowStyles: {
+              fillColor: lightRGB,
+            },
+          });
+
+          y = (doc as any).lastAutoTable.finalY + 18;
+        }
+      } else if (isList) {
+        const listItems = sec.content as string[];
+
+        listItems.forEach((item) => {
+          if (y > ph - 22) {
+            doc.addPage();
+            y = 30;
+
+            doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+            doc.rect(0, 0, 8, ph, "F");
+          }
+
+          const cleaned = cleanText(item);
+
+          if (!cleaned) return;
+
+          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+          doc.circle(21, y - 1.2, 0.6, "F");
+
+          const lines = doc.splitTextToSize(cleaned, pw - 48);
+
+          doc.text(lines, 26, y);
+          y += lines.length * 7 + 3;
+        });
+
+        y += 8;
+      } else {
+        const rawText =
+          typeof sec.content === "string"
+            ? sec.content
+            : JSON.stringify(sec.content);
+
+        const cleanedText = cleanText(rawText);
+        const lines = doc.splitTextToSize(cleanedText, pw - 36);
+
+        doc.text(lines, 18, y, { lineHeightFactor: 1.5 });
+        y += lines.length * 7.5 + 12;
+      }
+    });
+
+    if (y > ph - 55) {
+      doc.addPage();
+      y = 30;
 
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.rect(0, 0, pw, 28, 'F');
-      
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'F'); 
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(10, 10, pw - 20, 50, 4, 4, 'D');
-const logoMaxW = 75;
-const logoMaxH = 34;
+      doc.rect(0, 0, 8, ph, "F");
+    }
 
-const logoRatio = pdfLogo.width / pdfLogo.height;
+    doc.setFillColor(lightRGB[0], lightRGB[1], lightRGB[2]);
+    doc.roundedRect(15, y, pw - 30, 35, 2, 2, "F");
 
-let logoW = logoMaxW;
-let logoH = logoW / logoRatio;
+    doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(15, y, pw - 30, 35, 2, 2, "D");
 
-if (logoH > logoMaxH) {
-  logoH = logoMaxH;
-  logoW = logoH * logoRatio;
-}
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
 
-doc.addImage(
-  pdfLogo.dataUrl,
-  "PNG",
-  pw - logoW - 16,
-  15,
-  logoW,
-  logoH
-);
-      doc.setFontSize(30);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 30, 30);
-      
-      const schoolName = cleanText(state.details.school).toUpperCase() || "YOUR SCHOOL";
-      const titleLines = doc.splitTextToSize(schoolName, pw - 40);
-      
-      let titleY = 32;
-      if (titleLines.length > 1) titleY = 28;
-      if (titleLines.length > 2) titleY = 24;
+    doc.text(
+      "A Personal Message from your Student Shield: Smart Buddy:",
+      20,
+      y + 10
+    );
 
-      doc.text(titleLines, pw / 2, titleY, { align: 'center' });
-      
-      const subTitleY = titleY + (titleLines.length * 11) + 1;
-      
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-drawCenteredFittedText(
-  doc,
-  "STUDENT SHIELD SMART BUDDY: ULTRA-CORE SUCCESS ECOSYSTEM",
-  pw / 2,
-  46,
-  pw - 45,
-  7,
-  5.5
-);
-      
-      doc.setFillColor(248, 250, 252);
-      doc.rect(10, 68, pw - 20, 16, 'F');
-      doc.setDrawColor(220);
-      doc.line(10, 68, pw - 10, 68);
-      doc.line(10, 84, pw - 10, 84);
-      
-      doc.setFontSize(11);
-      doc.setTextColor(60);
-      doc.setFont('helvetica', 'bold');
-      const profile = `STUDENT: ${cleanText(state.details.name).toUpperCase()}  |  SCHOOL: ${cleanText(state.details.school).toUpperCase()}  |  CLASS: ${cleanText(state.details.grade)}  |  AGE: ${cleanText(state.details.age) || "—"}YRS`;
-doc.text(profile, pw / 2, 78, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(80, 80, 80);
 
-      doc.setFontSize(16);
-      doc.setTextColor(30);
-      doc.setFont('helvetica', 'bold');
-      doc.text(planTitle, pw / 2, 95, { align: 'center' });
+    const summaryLines = doc.splitTextToSize(
+      cleanText(result.summary || ""),
+      pw - 45
+    );
 
-      let y = 110;
+    doc.text(summaryLines, 20, y + 18, {
+      lineHeightFactor: 1.3,
+    });
 
-      result.sections.forEach((sec, idx) => {
-        if (y > ph - 45) {
-          doc.addPage();
-          y = 30;
-          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-          doc.rect(0, 0, 8, ph, 'F');
-        }
+    const pageCount = (doc as any).internal.getNumberOfPages();
 
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-        
-        // Fix: Strip existing numbering from AI output (e.g., "1. Introduction" -> "Introduction")
-        // preventing double numbering like "1. 1. Introduction"
-        const cleanHeading = cleanText(sec.heading).replace(/^\d+[\.\)\s]+\s*/, ''); 
-        const headerText = `${idx + 1}. ${cleanHeading.toUpperCase()}`;
-        
-        doc.text(headerText, 18, y);
-        const textWidth = doc.getTextWidth(headerText);
-        y += 2.5;
-        doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-        doc.setLineWidth(1.2);
-        doc.line(18, y, 18 + textWidth, y);
-        doc.setLineWidth(0.2); 
-        y += 12;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
 
-        doc.setFontSize(10.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(70, 70, 70);
+      doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+      doc.rect(0, 0, 5, ph, "F");
 
-        const isTable = Array.isArray(sec.content) && sec.content.length > 0 && typeof sec.content[0] === 'object';
-        const isList = Array.isArray(sec.content) && (sec.content.length === 0 || typeof sec.content[0] === 'string');
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(180, 180, 180);
 
-        if (isTable) {
-          const tableData = (sec.content as any[]).filter(row => row && typeof row === 'object');
-          if (tableData.length > 0) {
-            const headKeys = Object.keys(tableData[0]);
-            const headLabels = headKeys.map(k => k.replace(/([A-Z])/g, ' $1').toUpperCase());
-            const body = tableData.map((obj: any) => headKeys.map(k => cleanText(obj[k])));
-            autoTable(doc, {
-              startY: y,
-              head: [headLabels],
-              body: body,
-              margin: { left: 18, right: 18 },
-              theme: 'striped',
-              headStyles: { fillColor: primaryRGB, textColor: 255, fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 4 },
-              styles: { fontSize: 8.5, cellPadding: 4, valign: 'middle', textColor: 50, lineColor: [240, 240, 240], lineWidth: 0.1 },
-              alternateRowStyles: { fillColor: lightRGB },
-            });
-            y = (doc as any).lastAutoTable.finalY + 18;
-          }
-        } else if (isList) {
-          const listItems = sec.content as string[];
-          listItems.forEach(item => {
-            if (y > ph - 22) { doc.addPage(); y = 30; doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); doc.rect(0,0,8,ph,'F'); }
-            const cleaned = cleanText(item);
-            if (!cleaned) return;
-            doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-            doc.circle(21, y - 1.2, 0.6, 'F'); 
-            const lines = doc.splitTextToSize(cleaned, pw - 48);
-            doc.text(lines, 26, y);
-            y += (lines.length * 7) + 3;
-          });
-          y += 8;
-        } else {
-          const rawText = typeof sec.content === 'string' ? sec.content : JSON.stringify(sec.content);
-          const cleanedText = cleanText(rawText);
-          const lines = doc.splitTextToSize(cleanedText, pw - 36);
-          doc.text(lines, 18, y, { lineHeightFactor: 1.5 });
-          y += (lines.length * 7.5) + 12;
-        }
-      });
+      doc.text(
+        `Student Shield: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`,
+        pw / 2,
+        ph - 10,
+        { align: "center" }
+      );
+    }
 
-      if (y > ph - 55) { doc.addPage(); y = 30; doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); doc.rect(0,0,8,ph,'F'); }
-      doc.setFillColor(lightRGB[0], lightRGB[1], lightRGB[2]);
-      doc.roundedRect(15, y, pw - 30, 35, 2, 2, 'F');
-      doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(15, y, pw - 30, 35, 2, 2, 'D');
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.text('A Personal Message from your Student Sheild: Smart Buddy:', 20, y + 10);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(80, 80, 80);
-      const summaryLines = doc.splitTextToSize(cleanText(result.summary || ""), pw - 45);
-      doc.text(summaryLines, 20, y + 18, { lineHeightFactor: 1.3 });
+    const fileName = `${pdfStudent.name.replace(
+      /\s+/g,
+      "_"
+    )}_SmartBuddy_Plan.pdf`;
 
-      const pageCount = (doc as any).internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
-          doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-          doc.rect(0, 0, 5, ph, 'F');
-          doc.setFontSize(7.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(180, 180, 180);
-          doc.text(`Student Shield: SMART BUDDY ULTRA-CORE REPORT © 2025 | Page ${i} of ${pageCount}`, pw / 2, ph - 10, { align: 'center' });
+    const pdfBlob = doc.output("blob");
+
+    doc.save(fileName);
+
+    if (user.sessionToken) {
+      try {
+        const formData = new FormData();
+
+        formData.append("file", pdfBlob, fileName);
+
+        formData.append(
+          "report_title",
+          result.title || "Smart Buddy Report"
+        );
+
+        formData.append(
+          "report_data",
+          JSON.stringify({
+            student: pdfStudent,
+            details: {
+              name: pdfStudent.name,
+              age: pdfStudent.age,
+              grade: pdfStudent.grade,
+              school: pdfStudent.school,
+            },
+            branch: state.branch,
+            answers: state.answers,
+            routine: user.routine || {},
+            plan: result,
+            generated_at: new Date().toISOString(),
+          })
+        );
+
+        await uploadSmartBuddyReport(formData, user.sessionToken);
+
+        alert("PDF downloaded and saved to your Student Shield portal.");
+      } catch (uploadError) {
+        console.error("PDF archive upload failed:", uploadError);
+
+        alert(
+          "PDF downloaded, but could not be saved to Student Shield portal. Please try again."
+        );
       }
-      const fileName = `${state.details.name.replace(/\s+/g, '_')}_SmartBuddy_Plan.pdf`;
+    }
+  } catch (err) {
+    console.error("PDF Generation Error:", err);
 
-const pdfBlob = doc.output('blob');
-
-doc.save(fileName);
-
-if (user.sessionToken) {
-  try {
-    const formData = new FormData();
-
-    formData.append('file', pdfBlob, fileName);
-    formData.append(
-      'report_title',
-      result.title || 'Smart Buddy Report'
-    );
-    formData.append(
-      'report_data',
-      JSON.stringify({
-        details: state.details,
-        branch: state.branch,
-        answers: state.answers,
-        routine: user.routine || {},
-        plan: result,
-        generated_at: new Date().toISOString(),
-      })
-    );
-
-    await uploadSmartBuddyReport(formData, user.sessionToken);
-
-    alert('PDF downloaded and saved to your Student Shield portal.');
-  } catch (uploadError) {
-    console.error('PDF archive upload failed:', uploadError);
     alert(
-      'PDF downloaded, but could not be saved to Student Shield portal. Please try again.'
+      "Something went wrong while generating the PDF. Please try again or check the console."
     );
   }
-}
-    } catch (err) {
-      console.error("PDF Generation Error:", err);
-      alert("Something went wrong while generating the PDF. Please try again or check the console.");
-    }
-  };
+};
 
   useEffect(() => { handleStart(); }, []);
 
