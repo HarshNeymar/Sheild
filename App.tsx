@@ -362,6 +362,174 @@ const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogi
 
 // --- Main Chat Component ---
 
+const SavedSessionReview: React.FC<{
+  user: UserProfile;
+  onContinue: () => void;
+  onUpdate: () => void;
+}> = ({ user, onContinue, onUpdate }) => {
+  const formData = user.savedFormData || {};
+  const routine = formData.routine || {};
+  const answers = formData.answers || {};
+  const latestPlan = user.savedAssessmentData?.latest_plan;
+
+  const getSavedValue = (key: string) =>
+    firstNonEmpty(routine[key], answers[key], "Not set");
+
+  const lastSaved =
+    formData.updated_at ||
+    user.savedAssessmentData?.updated_at ||
+    user.savedAssessmentData?.generated_at;
+
+  return (
+    <div className="min-h-screen bg-slate-100 p-4 sm:p-8 flex items-center justify-center">
+      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden">
+        <div className="bg-indigo-600 px-6 py-7 text-white">
+          <p className="text-xs uppercase tracking-[0.25em] text-indigo-100">
+            Smart Buddy
+          </p>
+
+          <h1 className="text-2xl sm:text-3xl font-black mt-2">
+            Welcome back, {user.name}
+          </h1>
+
+          <p className="text-sm text-indigo-100 mt-2">
+            Review your saved session before continuing. You can update your
+            routine and answers anytime.
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div>
+            <h2 className="font-bold text-slate-800 text-lg">
+              Student Details
+            </h2>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+              <div className="rounded-xl bg-slate-50 border p-3">
+                <p className="text-xs text-slate-500">Student</p>
+                <p className="font-semibold text-slate-800 mt-1">
+                  {user.name || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border p-3">
+                <p className="text-xs text-slate-500">Age</p>
+                <p className="font-semibold text-slate-800 mt-1">
+                  {user.age || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border p-3">
+                <p className="text-xs text-slate-500">Class</p>
+                <p className="font-semibold text-slate-800 mt-1">
+                  {user.className || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border p-3">
+                <p className="text-xs text-slate-500">School</p>
+                <p className="font-semibold text-slate-800 mt-1">
+                  {user.schoolId || "—"}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-3">
+              Name, age, class and school are synced from Student Shield.
+              Update these from the main Student Shield portal.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="font-bold text-slate-800 text-lg">
+              Saved Routine & Preferences
+            </h2>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">Wake-up Time</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("wakeUp")}
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">School Hours</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("schoolHours")}
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">After School</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("afterSchool")}
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">Study Hours</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("studyHours")}
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">Dinner Time</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("dinnerTime")}
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-slate-500">Bedtime</p>
+                <p className="font-medium text-slate-800 mt-1">
+                  {getSavedValue("bedTime")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {latestPlan?.title && (
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">
+                Latest Saved Plan
+              </p>
+              <p className="font-bold text-indigo-950 mt-1">
+                {latestPlan.title}
+              </p>
+            </div>
+          )}
+
+          {lastSaved && (
+            <p className="text-xs text-slate-500">
+              Last saved: {new Date(lastSaved).toLocaleString()}
+            </p>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onContinue}
+              className="flex-1 rounded-xl bg-indigo-600 px-5 py-3 text-white font-bold hover:bg-indigo-700 transition"
+            >
+              Continue Saved Session
+            </button>
+
+            <button
+              type="button"
+              onClick={onUpdate}
+              className="flex-1 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-indigo-700 font-bold hover:bg-indigo-50 transition"
+            >
+              Update Routine & Answers
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ChatScreen: React.FC<{
   user: UserProfile;
   onLogout: () => void;
@@ -369,9 +537,19 @@ const ChatScreen: React.FC<{
   isAutoLogin?: boolean;
 }> = ({ user, onLogout, onUpdateUser, isAutoLogin = false }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  
  const savedFormData = user.savedFormData || {};
 const savedDetails = savedFormData.details || {};
+const savedRoutine = savedFormData.routine || {};
+const savedAnswers = savedFormData.answers || {};
 
+const hasSavedSession =
+  Object.keys(savedRoutine).length > 0 ||
+  Object.keys(savedAnswers).length > 0 ||
+  Boolean(user.savedAssessmentData?.latest_plan);
+
+const [showSavedSessionReview, setShowSavedSessionReview] =
+  useState(hasSavedSession);
 // Student Shield portal details override old Smart Buddy saved details.
 const studentDetails = {
   name: firstNonEmpty(user.name, savedDetails.name, "Student"),
@@ -1120,8 +1298,69 @@ const downloadPDF = async () => {
     );
   }
 };
+const continueSavedSession = () => {
+  setShowSavedSessionReview(false);
 
-  useEffect(() => { handleStart(); }, []);
+  addMessage({
+    sender: "bot",
+    text: `Welcome back, ${user.name}! Your saved session has been loaded. Choose what you would like to work on today.`,
+  });
+
+  setState((prev) => ({
+    ...prev,
+    step: "MAIN_CHOICE",
+    answers: {
+      ...savedAnswers,
+      ...savedRoutine,
+      ...prev.answers,
+    },
+  }));
+
+  showMainOptions();
+};
+
+const updateSavedSession = () => {
+  setShowSavedSessionReview(false);
+
+  addMessage({
+    sender: "bot",
+    text: `Sure, ${user.name}. Your previous routine is pre-filled below. Update anything that has changed and save it.`,
+  });
+
+  addMessage({
+    sender: "bot",
+    text: "Please update your daily schedule.",
+    type: "routine",
+  });
+
+  setState((prev) => ({
+    ...prev,
+    step: "COLLECTING_ROUTINE",
+    currentQuestionIndex: 0,
+    answers: {
+      ...savedAnswers,
+      ...savedRoutine,
+    },
+  }));
+};
+
+useEffect(() => {
+  if (!hasSavedSession) {
+    handleStart();
+  }
+  // Initial decision only. Saved users see the review screen first.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+if (showSavedSessionReview) {
+  return (
+    <SavedSessionReview
+      user={user}
+      onContinue={continueSavedSession}
+      onUpdate={updateSavedSession}
+    />
+  );
+}
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -1173,10 +1412,14 @@ const downloadPDF = async () => {
                 )}
 
                 {m.type === 'routine' && state.step === 'COLLECTING_ROUTINE' && (
-                  <RoutineForm 
-                    onSubmit={handleRoutineSubmit}
-                    isPreSchool={PRE_SCHOOL_CLASSES.includes(user.className)}
-                  />
+                 <RoutineForm
+  onSubmit={handleRoutineSubmit}
+  isPreSchool={PRE_SCHOOL_CLASSES.includes(user.className)}
+  initialValues={{
+    ...savedAnswers,
+    ...savedRoutine,
+  }}
+/>
                 )}
 
                 {m.type === 'download' && result && (
@@ -1320,18 +1563,25 @@ const DynamicActivityRow: React.FC<{
 );
 
 const RoutineForm: React.FC<{
-  onSubmit: (d: Record<string, string>) => void,
-  isPreSchool: boolean
-}> = ({ onSubmit, isPreSchool }) => {
-  const [base, setBase] = useState({
-    wakeUp: '',
-    lunchTime: '',
-    dinnerTime: '',
-    bedTime: ''
-  });
+  onSubmit: (d: Record<string, string>) => void;
+  isPreSchool: boolean;
+  initialValues?: Record<string, string>;
+}> = ({ onSubmit, isPreSchool, initialValues = {} }) => {
+  const [schoolStart = "", schoolEnd = ""] = String(
+  initialValues.schoolHours || ""
+)
+  .split(/\s+to\s+/i)
+  .map((value) => value.trim());
 
-  const [schoolStart, setSchoolStart] = useState('');
-  const [schoolEnd, setSchoolEnd] = useState('');
+const [base, setBase] = useState({
+  wakeUp: initialValues.wakeUp || "",
+  lunchTime: initialValues.lunchTime || "",
+  dinnerTime: initialValues.dinnerTime || "",
+  bedTime: initialValues.bedTime || "",
+});
+
+const [savedSchoolStart, setSchoolStart] = useState(schoolStart);
+const [savedSchoolEnd, setSchoolEnd] = useState(schoolEnd);
 
   // Dynamic States for multiple activities
   const [afterSchool, setAfterSchool] = useState([{ name: '', start: '', end: '' }]);
@@ -1354,7 +1604,7 @@ const RoutineForm: React.FC<{
   const handleSubmit = () => {
     const submissionData = {
       wakeUp: base.wakeUp,
-      schoolHours: `${schoolStart} to ${schoolEnd}`,
+      schoolHours: `${savedSchoolStart} to ${savedSchoolEnd}`,
       lunchTime: base.lunchTime,
       napRoutine: isPreSchool ? formatActivities(afterSchool) : '',
       afterSchool: !isPreSchool ? formatActivities(afterSchool) : '',
@@ -1367,7 +1617,26 @@ const RoutineForm: React.FC<{
   };
 
   const isComplete = base.wakeUp && schoolStart && schoolEnd && base.lunchTime && base.dinnerTime && base.bedTime;
+const ROUTINE_FIELDS = [
+  "wakeUp",
+  "schoolHours",
+  "lunchTime",
+  "napRoutine",
+  "afterSchool",
+  "tuitionTime",
+  "eveningActivity",
+  "dinnerTime",
+  "bedTime",
+];
 
+const getRoutineOnly = (source: Record<string, any>) =>
+  ROUTINE_FIELDS.reduce((result, key) => {
+    if (source[key] !== undefined && source[key] !== null) {
+      result[key] = source[key];
+    }
+
+    return result;
+  }, {} as Record<string, string>);
   return (
     <div className="mt-4 pb-4">
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1378,11 +1647,13 @@ const RoutineForm: React.FC<{
       <div className="mb-4">
         <label className="block text-[10px] font-extrabold text-slate-500 uppercase mb-2 px-1">School Hours</label>
         <div className="grid grid-cols-2 gap-3">
-          <select value={schoolStart} onChange={e => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+          <select value={savedSchoolStart}
+onChange={(e) => setSchoolStart(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
             <option value="">Start</option>
             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <select value={schoolEnd} onChange={e => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
+          <select value={savedSchoolEnd}
+onChange={(e) => setSchoolEnd(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none focus:border-indigo-500 cursor-pointer">
             <option value="">End</option>
             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
