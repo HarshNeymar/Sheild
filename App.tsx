@@ -168,6 +168,25 @@ const QUESTIONS: Record<UserBranch, { key: string, q: string, options: string[] 
   ]
 };
 
+const ROUTINE_FIELDS = [
+  "wakeUp",
+  "schoolHours",
+  "lunchTime",
+  "napRoutine",
+  "afterSchool",
+  "tuitionTime",
+  "eveningActivity",
+  "dinnerTime",
+  "bedTime",
+];
+const getRoutineOnly = (source: Record<string, any>) =>
+  ROUTINE_FIELDS.reduce((result, key) => {
+    if (source[key] !== undefined && source[key] !== null) {
+      result[key] = source[key];
+    }
+
+    return result;
+  }, {} as Record<string, string>);
 // --- Auth Components ---
 
 const AuthScreen: React.FC<{ onLogin: (user: UserProfile) => void }> = ({ onLogin }) => {
@@ -735,7 +754,26 @@ const handleStart = () => {
       
       // Skip COLLECTING_DETAILS and go straight to BRANCH_QUESTIONS
       // Initialize question index
-      setState(prev => ({ ...prev, branch, step: 'BRANCH_QUESTIONS', currentQuestionIndex: 0 }));
+      const routineOnly = getRoutineOnly({
+  ...savedRoutine,
+  ...state.answers,
+});
+
+setState((prev) => ({
+  ...prev,
+  branch,
+  step: "BRANCH_QUESTIONS",
+  currentQuestionIndex: 0,
+  answers: routineOnly,
+}));
+
+void persistSmartBuddyProfile({
+  routine: routineOnly,
+  answers: routineOnly,
+  branch,
+  details: state.details,
+  currentQuestionIndex: 0,
+});
 
       // Trigger first question
       const firstQ = QUESTIONS[branch][0];
@@ -1431,7 +1469,30 @@ if (showSavedSessionReview) {
                       <i className="fa-solid fa-file-pdf"></i> Download Ultra-Core Success Plan
                     </button>
                     <button 
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+  setResult(null);
+  setMessages([]);
+
+  setState((prev) => ({
+    ...prev,
+    step: "MAIN_CHOICE",
+    branch: undefined,
+    currentQuestionIndex: 0,
+    answers: getRoutineOnly({
+      ...savedRoutine,
+      ...prev.answers,
+    }),
+  }));
+
+  setTimeout(() => {
+    addMessage({
+      sender: "bot",
+      text: `Let's create a new plan, ${user.name}. Choose your support type.`,
+    });
+
+    showMainOptions();
+  }, 0);
+}}
                       className="w-full mt-2 py-2 text-slate-400 font-bold text-xs hover:text-slate-600"
                     >
                       Start New Analysis
@@ -1629,14 +1690,14 @@ const ROUTINE_FIELDS = [
   "bedTime",
 ];
 
-const getRoutineOnly = (source: Record<string, any>) =>
-  ROUTINE_FIELDS.reduce((result, key) => {
-    if (source[key] !== undefined && source[key] !== null) {
-      result[key] = source[key];
-    }
+// const getRoutineOnly = (source: Record<string, any>) =>
+//   ROUTINE_FIELDS.reduce((result, key) => {
+//     if (source[key] !== undefined && source[key] !== null) {
+//       result[key] = source[key];
+//     }
 
-    return result;
-  }, {} as Record<string, string>);
+//     return result;
+//   }, {} as Record<string, string>);
   return (
     <div className="mt-4 pb-4">
       <div className="grid grid-cols-2 gap-3 mb-4">
